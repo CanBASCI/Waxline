@@ -134,6 +134,20 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bir kadranı çevir" } }
       }
     },
+    "step_place" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Seal" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Mühür" } }
+      }
+    },
+    "step_rotate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rotate" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çevir" } }
+      }
+    },
     "rotate_ccw" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -59,13 +59,13 @@ struct GameView: View {
                 .font(.system(.body, design: .serif).weight(.medium))
                 .foregroundStyle(Theme.ink)
             Spacer()
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 Text(turnTitle)
                     .font(.system(.headline, design: .serif))
                     .foregroundStyle(currentColor)
-                Text(phaseTitle)
-                    .font(.system(.subheadline, design: .serif))
-                    .foregroundStyle(Theme.ink.opacity(0.65))
+                if game.status == .playing {
+                    turnSteps
+                }
             }
             Spacer()
             Circle()
@@ -150,9 +150,24 @@ struct GameView: View {
         return game.currentPlayer == .red ? t("turn_red") : t("turn_indigo")
     }
 
-    private var phaseTitle: String {
-        if game.status != .playing { return "" }
-        return game.phase == .place ? t("phase_place") : t("phase_rotate")
+    private var turnSteps: some View {
+        HStack(spacing: 8) {
+            stepChip(t("step_place"), active: game.phase == .place)
+            Image(systemName: "arrow.right")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Theme.ink.opacity(0.35))
+            stepChip(t("step_rotate"), active: game.phase == .rotate)
+        }
+        .animation(.easeInOut(duration: 0.28), value: game.phase)
+    }
+
+    private func stepChip(_ title: String, active: Bool) -> some View {
+        Text(title)
+            .font(.system(.caption, design: .serif).weight(.semibold))
+            .foregroundStyle(active ? Theme.cream : Theme.ink.opacity(0.55))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(active ? currentColor : Theme.ink.opacity(0.08), in: Capsule())
     }
 
     private var isAIThinking: Bool {

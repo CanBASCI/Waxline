@@ -44,6 +44,9 @@ final class BoardSceneController: NSObject {
     func setInteraction(canPlace: Bool, canSelectQuadrant: Bool) {
         allowsCellTaps = canPlace && !isAnimating
         allowsQuadrantTaps = canSelectQuadrant && !isAnimating
+        for node in quadrantNodes.values {
+            node.removeAction(forKey: "inviteRotate")
+        }
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0.32
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -53,6 +56,25 @@ final class BoardSceneController: NSObject {
             node.scale = selected ? SCNVector3(1.045, 1.045, 1.045) : SCNVector3(1, 1, 1)
         }
         SCNTransaction.commit()
+        if canSelectQuadrant, selectedQuadrant == nil {
+            startRotateInvite()
+        }
+    }
+
+    private func startRotateInvite() {
+        for (quadrant, node) in quadrantNodes {
+            let x = node.position.x
+            let z = node.position.z
+            let delay = SCNAction.wait(duration: 0.08 * Double(quadrant.rawValue))
+            let up = SCNAction.move(to: SCNVector3(x, 0.34, z), duration: 0.52)
+            up.timingMode = .easeInEaseOut
+            let down = SCNAction.move(to: SCNVector3(x, 0.16, z), duration: 0.52)
+            down.timingMode = .easeInEaseOut
+            let twoLifts = SCNAction.sequence([up, down, up, down])
+            let rest = SCNAction.wait(duration: 5)
+            let loop = SCNAction.repeatForever(.sequence([twoLifts, rest]))
+            node.runAction(.sequence([delay, loop]), forKey: "inviteRotate")
+        }
     }
 
     func syncBoard(_ model: BoardModel, winningLine: [Position]?) {
@@ -86,6 +108,9 @@ final class BoardSceneController: NSObject {
         isAnimating = true
         allowsCellTaps = false
         allowsQuadrantTaps = false
+        for node in quadrantNodes.values {
+            node.removeAction(forKey: "inviteRotate")
+        }
         rotationCompletion = completion
         let target: Float = clockwise ? -.pi / 2 : .pi / 2
         SCNTransaction.begin()
@@ -339,40 +364,48 @@ final class BoardSceneController: NSObject {
 
     private func buildScene() {
         scene.background.contents = PaperStyle.cream
+        scene.lightingEnvironment.contents = PaperStyle.waxLightingCube()
+        scene.lightingEnvironment.intensity = 0.45
         scene.rootNode.addChildNode(boardRoot)
 
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.color = UIColor(white: 0.55, alpha: 1)
-        ambient.light?.intensity = 500
+        ambient.light?.color = UIColor(white: 0.48, alpha: 1)
+        ambient.light?.intensity = 380
         scene.rootNode.addChildNode(ambient)
 
         let sun = SCNNode()
         sun.light = SCNLight()
         sun.light?.type = .directional
         sun.light?.color = UIColor(red: 1, green: 0.96, blue: 0.88, alpha: 1)
-        sun.light?.intensity = 620
+        sun.light?.intensity = 720
         sun.light?.castsShadow = true
-        sun.light?.shadowRadius = 8
+        sun.light?.shadowMode = .deferred
+        sun.light?.orthographicScale = 14
+        sun.light?.shadowMapSize = CGSize(width: 2048, height: 2048)
+        sun.light?.maximumShadowDistance = 40
+        sun.light?.shadowRadius = 6
         sun.light?.shadowSampleCount = 8
-        sun.light?.shadowColor = UIColor(white: 0, alpha: 0.12)
-        sun.eulerAngles = SCNVector3(-0.85, 0.5, 0)
-        sun.position = SCNVector3(4, 10, 6)
+        sun.light?.shadowColor = UIColor(white: 0, alpha: 0.22)
+        sun.eulerAngles = SCNVector3(-0.95, 0.55, 0)
+        sun.position = SCNVector3(5, 11, 6)
         scene.rootNode.addChildNode(sun)
 
         let fill = SCNNode()
         fill.light = SCNLight()
         fill.light?.type = .omni
-        fill.light?.intensity = 280
+        fill.light?.intensity = 260
         fill.light?.color = UIColor(red: 0.95, green: 0.9, blue: 1, alpha: 1)
         fill.position = SCNVector3(-5, 6, 4)
         scene.rootNode.addChildNode(fill)
 
         let table = SCNBox(width: CGFloat(tableSize), height: 0.12, length: CGFloat(tableSize), chamferRadius: 0.08)
-        table.materials = [PaperStyle.paperMaterial()]
+        let wood = PaperStyle.woodMaterial()
+        table.materials = [wood, wood, wood, wood, wood, wood]
         let tableNode = SCNNode(geometry: table)
         tableNode.position = SCNVector3(0, -0.18, 0)
+        tableNode.castsShadow = false
         boardRoot.addChildNode(tableNode)
 
         for quadrant in Quadrant.allCases {
@@ -440,8 +473,8 @@ final class BoardSceneController: NSObject {
         node.position = center
 
         let width = CGFloat(cellSize * 3 + 0.08)
-        let top = PaperStyle.unlit(PaperStyle.cream)
-        let edge = PaperStyle.unlit(PaperStyle.creamDark)
+        let top = PaperStyle.graniteMaterial(offset: Float(quadrant.rawValue) * 0.17)
+        let edge = PaperStyle.graniteMaterial(dark: true, offset: Float(quadrant.rawValue) * 0.11)
         let sheet = SCNBox(width: width, height: 0.2, length: width, chamferRadius: 0.045)
         sheet.materials = [edge, edge, edge, edge, top, edge]
         let sheetNode = SCNNode(geometry: sheet)
@@ -476,8 +509,8 @@ final class BoardSceneController: NSObject {
         let height: Float = 0.07
         let half = width / 2
         let xs: [Float] = [-(half - bar / 2), -cellSize / 2, cellSize / 2, half - bar / 2]
-        let cream = PaperStyle.matte(PaperStyle.cream)
-        let edge = PaperStyle.matte(PaperStyle.creamDark)
+        let cream = PaperStyle.graniteMaterial(offset: 0.31)
+        let edge = PaperStyle.graniteMaterial(dark: true, offset: 0.44)
         for x in xs {
             let geometry = SCNBox(width: CGFloat(bar), height: CGFloat(height), length: CGFloat(width), chamferRadius: 0.02)
             geometry.materials = [edge, edge, edge, edge, cream, edge]
@@ -508,14 +541,14 @@ final class BoardSceneController: NSObject {
         )
 
         let floor = SCNBox(width: CGFloat(well), height: 0.02, length: CGFloat(well), chamferRadius: 0.02)
-        floor.materials = [PaperStyle.matte(PaperStyle.cellWell)]
+        floor.materials = [PaperStyle.graniteMaterial(dark: true, offset: 0.22)]
         let floorNode = SCNNode(geometry: floor)
         floorNode.name = "cell_\(row)_\(col)"
         node.addChildNode(floorNode)
 
         let wallH: Float = 0.055
         let wallT: Float = 0.02
-        let wallMat = PaperStyle.matte(PaperStyle.creamDark)
+        let wallMat = PaperStyle.graniteMaterial(dark: true, offset: 0.08)
         let north = SCNBox(width: CGFloat(well), height: CGFloat(wallH), length: CGFloat(wallT), chamferRadius: 0.004)
         north.materials = [wallMat]
         let south = SCNBox(width: CGFloat(well), height: CGFloat(wallH), length: CGFloat(wallT), chamferRadius: 0.004)
@@ -562,9 +595,12 @@ final class BoardSceneController: NSObject {
         let node = SCNNode(geometry: box)
 
         let motif = SCNShape(path: PaperStyle.starPath(), extrusionDepth: 0.03)
-        let motifMat = SCNMaterial()
-        motifMat.diffuse.contents = UIColor(red: 0.95, green: 0.82, blue: 0.45, alpha: 1)
-        motifMat.emission.contents = UIColor(red: 0.95, green: 0.82, blue: 0.45, alpha: glow ? 0.5 : 0.15)
+        let motifMat = PaperStyle.waxMaterial(color: UIColor(red: 0.95, green: 0.82, blue: 0.45, alpha: 1))
+        motifMat.metalness.contents = 0.35
+        motifMat.roughness.contents = 0.28
+        if glow {
+            motifMat.emission.contents = UIColor(red: 0.95, green: 0.82, blue: 0.45, alpha: 0.45)
+        }
         motif.materials = [motifMat]
         let motifNode = SCNNode(geometry: motif)
         motifNode.eulerAngles.x = -.pi / 2
