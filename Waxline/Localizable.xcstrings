@@ -1,0 +1,335 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "app_name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Waxline" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Waxline" } }
+      }
+    },
+    "app_subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "A paper strategy game" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kâğıt strateji oyunu" } }
+      }
+    },
+    "menu_local" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pass & Play" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sırayla oyna" } }
+      }
+    },
+    "menu_ai" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play vs AI" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yapay zekâya karşı" } }
+      }
+    },
+    "menu_gamecenter" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Game Center 1v1" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Game Center 1v1" } }
+      }
+    },
+    "menu_settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ayarlar" } }
+      }
+    },
+    "menu_how_to_play" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "How to play" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Nasıl oynanır" } }
+      }
+    },
+    "menu" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Menu" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Menü" } }
+      }
+    },
+    "done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Done" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tamam" } }
+      }
+    },
+    "ai_easy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Easy" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kolay" } }
+      }
+    },
+    "ai_medium" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Medium" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Orta" } }
+      }
+    },
+    "ai_hard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hard" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Zor" } }
+      }
+    },
+    "turn_red" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Red's turn" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kırmızının sırası" } }
+      }
+    },
+    "turn_indigo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Indigo's turn" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çivitin sırası" } }
+      }
+    },
+    "turn_you" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your turn" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Senin sıran" } }
+      }
+    },
+    "turn_waiting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Waiting for opponent" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Rakip bekleniyor" } }
+      }
+    },
+    "phase_place" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Place a seal" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Mühür bas" } }
+      }
+    },
+    "phase_rotate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose a quadrant, then rotate" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bir kadran seç, sonra çevir" } }
+      }
+    },
+    "rotate_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rotate a quadrant" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bir kadranı çevir" } }
+      }
+    },
+    "rotate_ccw" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rotate left" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sola çevir" } }
+      }
+    },
+    "rotate_cw" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rotate right" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sağa çevir" } }
+      }
+    },
+    "you_win" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "You win" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kazandın" } }
+      }
+    },
+    "you_lose" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "You lose" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaybettin" } }
+      }
+    },
+    "red_wins" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Red wins" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kırmızı kazandı" } }
+      }
+    },
+    "indigo_wins" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Indigo wins" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çivit kazandı" } }
+      }
+    },
+    "draw" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Draw" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Berabere" } }
+      }
+    },
+    "play_again" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play again" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yeniden oyna" } }
+      }
+    },
+    "settings_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ayarlar" } }
+      }
+    },
+    "settings_sound" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sound" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ses" } }
+      }
+    },
+    "settings_haptics" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Haptics" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Titreşim" } }
+      }
+    },
+    "settings_ai" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "AI level" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Zekâ seviyesi" } }
+      }
+    },
+    "settings_language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Language" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dil" } }
+      }
+    },
+    "language_system" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "System" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sistem" } }
+      }
+    },
+    "language_english" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "English" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "İngilizce" } }
+      }
+    },
+    "language_turkish" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Turkish" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Türkçe" } }
+      }
+    },
+    "onboarding_place" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Place a seal on any empty cell." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Boş bir hücreye mühür bas." } }
+      }
+    },
+    "onboarding_quadrant" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose one of the four quadrants." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dört kadrandan birini seç." } }
+      }
+    },
+    "onboarding_rotate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rotate it a quarter turn." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çeyrek tur çevir." } }
+      }
+    },
+    "onboarding_five" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Make five in a row to win." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Beşli sıra yaparak kazan." } }
+      }
+    },
+    "onboarding_skip" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skip" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Geç" } }
+      }
+    },
+    "onboarding_next" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "İleri" } }
+      }
+    },
+    "onboarding_done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Başla" } }
+      }
+    },
+    "gc_sign_in" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sign in to Game Center" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Game Center’a giriş yap" } }
+      }
+    },
+    "gc_unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Game Center is unavailable. Sign in via Settings." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Game Center kullanılamıyor. Ayarlar’dan giriş yap." } }
+      }
+    },
+    "waiting_ai" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Indigo is thinking…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çivit düşünüyor…" } }
+      }
+    },
+    "view_2d" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "2D" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "2D" } }
+      }
+    },
+    "view_3d" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "3D" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "3D" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -1,17 +1,17 @@
-//
-//  WaxlineApp.swift
-//  Waxline
-//
-//  Created by Can Basci on 1.09.2026.
-//
-
 import SwiftUI
 
 @main
 struct WaxlineApp: App {
+    @State private var settings = SettingsStore()
+    @State private var gameCenter = GameCenterService()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environment(settings)
+                .environment(gameCenter)
+                .preferredColorScheme(.light)
+                .tint(Theme.waxRed)
         }
     }
 }
