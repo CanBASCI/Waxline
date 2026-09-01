@@ -9,9 +9,11 @@ final class BoardSceneController: NSObject {
 
     var onCellTap: ((Position) -> Void)?
     var onQuadrantTap: ((Quadrant?) -> Void)?
-    var onRotateGesture: ((Bool) -> Void)?
+    var onRotateGesture: ((Quadrant, Bool) -> Void)?
 
     private let boardRoot = SCNNode()
+    private var tableNode = SCNNode()
+    private var sealPalette: SealPalette = .classic
     private var quadrantNodes: [Quadrant: SCNNode] = [:]
     private var cellNodes: [String: SCNNode] = [:]
     private var sealNodes: [String: SCNNode] = [:]
@@ -30,6 +32,10 @@ final class BoardSceneController: NSObject {
     private var panGrabCorner = SIMD2<Float>.zero
     private var panStartBoardXZ = SIMD2<Float>.zero
     private var panTabletDelta: Float = 0
+    private var panLastFingerAngle: Float = 0
+    private var panUnwrappedDelta: Float = 0
+    private var panQuadrant: Quadrant?
+    private var panRotatingTablet = false
     private var lastViewSize = CGSize(width: 390, height: 520)
 
     private let playScale: Float = 1.10
@@ -49,14 +55,25 @@ final class BoardSceneController: NSObject {
     func setInteraction(canPlace: Bool, canSelectQuadrant: Bool) {
         allowsCellTaps = canPlace && !isAnimating
         allowsQuadrantTaps = canSelectQuadrant && !isAnimating
+        stopRotateInvite()
+        poseTablets(canSelect: canSelectQuadrant)
+        if canSelectQuadrant, selectedQuadrant == nil {
+            startRotateInvite()
+        }
+    }
+
+    private func stopRotateInvite() {
         for node in quadrantNodes.values {
             node.removeAction(forKey: "inviteRotate")
         }
+    }
+
+    private func poseTablets(canSelect: Bool) {
         SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0.32
+        SCNTransaction.animationDuration = 0.28
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         for (quadrant, node) in quadrantNodes {
-            let selected = selectedQuadrant == quadrant && canSelectQuadrant
+            let selected = selectedQuadrant == quadrant && canSelect
             if selected {
                 node.position = selectedPosition(for: quadrant)
                 node.scale = SCNVector3(1.045, 1.045, 1.045)
@@ -66,9 +83,6 @@ final class BoardSceneController: NSObject {
             }
         }
         SCNTransaction.commit()
-        if canSelectQuadrant, selectedQuadrant == nil {
-            startRotateInvite()
-        }
     }
 
     private func startRotateInvite() {
@@ -102,6 +116,7 @@ final class BoardSceneController: NSObject {
     }
 
     func syncBoard(_ model: BoardModel, winningLine: [Position]?) {
+        clearWinHighlight()
         for row in 0..<6 {
             for col in 0..<6 {
                 let key = cellKey(row: row, col: col)
@@ -109,9 +124,7 @@ final class BoardSceneController: NSObject {
             }
         }
         if let winningLine {
-            for position in winningLine {
-                updateSeal(key: cellKey(row: position.row, col: position.col), cell: model.cells[position.row][position.col], glow: true)
-            }
+            showWin(line: winningLine, model: model)
         }
     }
 
@@ -132,11 +145,13 @@ final class BoardSceneController: NSObject {
         isAnimating = true
         allowsCellTaps = false
         allowsQuadrantTaps = false
-        for node in quadrantNodes.values {
-            node.removeAction(forKey: "inviteRotate")
-        }
+        stopRotateInvite()
         rotationCompletion = completion
         let target: Float = clockwise ? -.pi / 2 : .pi / 2
+        if abs(node.eulerAngles.y - target) < 0.08 {
+            finishRotation(quadrant: quadrant, model: model)
+            return
+        }
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0.38
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -157,6 +172,35 @@ final class BoardSceneController: NSObject {
         let done = rotationCompletion
         rotationCompletion = nil
         done?()
+    }
+
+    func applyLook(dark: Bool, seals: SealPalette, table: TableFinish, tablet: TabletFinish) {
+        sealPalette = seals
+        scene.background.contents = dark ? PaperStyle.darkCanvas : PaperStyle.cream
+        scnView?.backgroundColor = dark ? PaperStyle.darkCanvas : PaperStyle.cream
+        let wood = PaperStyle.tableMaterial(table)
+        tableNode.geometry?.materials = [wood, wood, wood, wood, wood, wood]
+        for (quadrant, node) in quadrantNodes {
+            let top = PaperStyle.tabletMaterial(tablet, recessed: false, offset: Float(quadrant.rawValue) * 0.17)
+            let edge = PaperStyle.tabletMaterial(tablet, recessed: true, offset: Float(quadrant.rawValue) * 0.11)
+            paintTablet(node, top: top, edge: edge)
+        }
+    }
+
+    private func paintTablet(_ node: SCNNode, top: SCNMaterial, edge: SCNMaterial) {
+        let name = node.name ?? ""
+        let isWell = name.hasPrefix("cell_")
+        let isTablet = name.hasPrefix("quad_")
+        if (isWell || isTablet), let box = node.geometry as? SCNBox {
+            if isWell {
+                box.materials = [edge]
+            } else {
+                box.materials = [edge, edge, edge, edge, top, edge]
+            }
+        }
+        for child in node.childNodes {
+            paintTablet(child, top: top, edge: edge)
+        }
     }
 
     func setPerspective3D(_ is3D: Bool) {
@@ -209,40 +253,46 @@ final class BoardSceneController: NSObject {
     }
 
     private func beginTabletPan(at viewPoint: CGPoint, in view: SCNView) {
-        guard let quadrant = selectedQuadrant, let node = quadrantNodes[quadrant] else { return }
+        guard let quadrant = panQuadrant, let node = quadrantNodes[quadrant] else { return }
+        selectTablet(quadrant)
         panStartTabletYaw = node.eulerAngles.y
         panTabletDelta = 0
-        let center = SIMD2(node.position.x, node.position.z)
+        panUnwrappedDelta = 0
+        let lifted = selectedPosition(for: quadrant)
+        let center = SIMD2(lifted.x, lifted.z)
         panTabletCenter = center
-        let half = (cellSize * 3 + sheetPad) / 2
         let point = boardXZ(from: viewPoint, in: view) ?? center
         panStartBoardXZ = point
-        panGrabCorner = nearestSquareCorner(center: center, half: half, to: point)
+        panLastFingerAngle = fingerAngle(at: point, center: center)
     }
 
     private func updateTabletPan(at viewPoint: CGPoint, in view: SCNView) {
-        guard !isAnimating, let quadrant = selectedQuadrant, let node = quadrantNodes[quadrant] else { return }
+        guard !isAnimating, let quadrant = panQuadrant, let node = quadrantNodes[quadrant] else { return }
         guard let now = boardXZ(from: viewPoint, in: view) else { return }
-        let grab = panGrabCorner - panTabletCenter
-        let dragged = panGrabCorner + (now - panStartBoardXZ) - panTabletCenter
-        var delta = signedAngle(from: grab, to: dragged)
+        let vector = now - panTabletCenter
+        guard simd_length(vector) > 0.12 else { return }
+        let angle = fingerAngle(at: now, center: panTabletCenter)
+        panUnwrappedDelta += wrappedDelta(from: panLastFingerAngle, to: angle)
+        panLastFingerAngle = angle
         let limit = Float.pi / 2
-        delta = min(max(delta, -limit), limit)
-        panTabletDelta = delta
-        node.eulerAngles.y = panStartTabletYaw + delta
+        panTabletDelta = min(max(panUnwrappedDelta, -limit), limit)
+        node.eulerAngles.y = panStartTabletYaw + panTabletDelta
     }
 
     private func endTabletPan() {
         guard !isAnimating else { return }
-        if abs(panTabletDelta) > 0.28 {
-            onRotateGesture?(panTabletDelta < 0)
-        } else if let quadrant = selectedQuadrant, let node = quadrantNodes[quadrant] {
+        if abs(panTabletDelta) > 0.28, let quadrant = panQuadrant {
+            onRotateGesture?(quadrant, panTabletDelta < 0)
+            return
+        }
+        if let quadrant = panQuadrant, let node = quadrantNodes[quadrant] {
             SCNTransaction.begin()
-            SCNTransaction.animationDuration = 0.38
+            SCNTransaction.animationDuration = 0.28
             SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             node.eulerAngles.y = 0
             SCNTransaction.commit()
         }
+        clearTabletSelection()
     }
 
     private func worldXZ(from viewPoint: CGPoint, in view: SCNView) -> SIMD2<Float>? {
@@ -289,30 +339,48 @@ final class BoardSceneController: NSObject {
         return atan2(cross, dot)
     }
 
+    private func fingerAngle(at point: SIMD2<Float>, center: SIMD2<Float>) -> Float {
+        let vector = point - center
+        return atan2(vector.x, vector.y)
+    }
+
+    private func wrappedDelta(from previous: Float, to next: Float) -> Float {
+        var step = next - previous
+        let pi = Float.pi
+        if step > pi { step -= 2 * pi }
+        if step < -pi { step += 2 * pi }
+        return step
+    }
+
     @objc func handleBoardPan(_ gesture: UIPanGestureRecognizer) {
         guard let view = gesture.view as? SCNView else { return }
         let location = gesture.location(in: view)
-        let rotatingTablet = allowsQuadrantTaps && selectedQuadrant != nil
         switch gesture.state {
         case .began:
             beginPan()
-            if rotatingTablet {
+            panRotatingTablet = false
+            panQuadrant = nil
+            if allowsQuadrantTaps, let world = boardPoint(from: location, in: view), let quadrant = quadrant(at: world) {
+                panQuadrant = quadrant
+                panRotatingTablet = true
                 beginTabletPan(at: location, in: view)
             } else {
                 beginTablePan(at: location, in: view)
             }
         case .changed:
-            if rotatingTablet {
+            if panRotatingTablet {
                 updateTabletPan(at: location, in: view)
             } else {
                 updateTablePan(at: location, in: view)
             }
         case .ended, .cancelled, .failed:
-            if rotatingTablet {
+            if panRotatingTablet {
                 endTabletPan()
             } else {
                 endTablePan()
             }
+            panRotatingTablet = false
+            panQuadrant = nil
         default:
             break
         }
@@ -327,21 +395,39 @@ final class BoardSceneController: NSObject {
         SCNTransaction.commit()
     }
 
+    func handleTouchBegan(at viewPoint: CGPoint, in view: SCNView) {
+        guard !isAnimating, allowsQuadrantTaps else { return }
+        guard let world = boardPoint(from: viewPoint, in: view), let quadrant = quadrant(at: world) else { return }
+        selectTablet(quadrant)
+    }
+
+    func handleTouchEnded() {
+        guard !isAnimating, !panRotatingTablet else { return }
+        clearTabletSelection()
+    }
+
+    private func selectTablet(_ quadrant: Quadrant) {
+        if selectedQuadrant == quadrant {
+            stopRotateInvite()
+            return
+        }
+        selectedQuadrant = quadrant
+        setInteraction(canPlace: false, canSelectQuadrant: true)
+        onQuadrantTap?(quadrant)
+    }
+
+    private func clearTabletSelection() {
+        guard selectedQuadrant != nil else { return }
+        selectedQuadrant = nil
+        onQuadrantTap?(nil)
+        setInteraction(canPlace: false, canSelectQuadrant: allowsQuadrantTaps)
+    }
+
     func handleTap(at viewPoint: CGPoint, in view: SCNView) {
         guard !isAnimating else { return }
         guard let world = boardPoint(from: viewPoint, in: view) else { return }
         if allowsCellTaps, let position = cell(at: world) {
             onCellTap?(position)
-            return
-        }
-        if allowsQuadrantTaps, let quadrant = quadrant(at: world) {
-            if selectedQuadrant == quadrant {
-                selectedQuadrant = nil
-            } else {
-                selectedQuadrant = quadrant
-            }
-            setInteraction(canPlace: false, canSelectQuadrant: true)
-            onQuadrantTap?(selectedQuadrant)
         }
     }
 
@@ -427,7 +513,7 @@ final class BoardSceneController: NSObject {
         let table = SCNBox(width: CGFloat(tableSize), height: 0.12, length: CGFloat(tableSize), chamferRadius: 0.16)
         let wood = PaperStyle.woodMaterial()
         table.materials = [wood, wood, wood, wood, wood, wood]
-        let tableNode = SCNNode(geometry: table)
+        tableNode = SCNNode(geometry: table)
         tableNode.position = SCNVector3(0, -0.18, 0)
         tableNode.castsShadow = false
         boardRoot.addChildNode(tableNode)
@@ -601,14 +687,16 @@ final class BoardSceneController: NSObject {
         sealNodes[key]?.removeFromParentNode()
         sealNodes[key] = nil
         guard cell != .empty, let parent = cellNodes[key] else { return }
-        let color = cell == .red ? PaperStyle.waxRed : PaperStyle.waxIndigo
-        let seal = makeSeal(color: color, glow: glow)
+        let player: Player = cell == .red ? .red : .indigo
+        let color = PaperStyle.waxColor(for: player, palette: sealPalette)
+        let motifColor = (sealPalette == .mono && player == .indigo) ? PaperStyle.waxBlack : UIColor(red: 0.95, green: 0.82, blue: 0.45, alpha: 1)
+        let seal = makeSeal(color: color, motifColor: motifColor, glow: glow)
         seal.position.y = 0.07 * playScale
         parent.addChildNode(seal)
         sealNodes[key] = seal
     }
 
-    private func makeSeal(color: UIColor, glow: Bool) -> SCNNode {
+    private func makeSeal(color: UIColor, motifColor: UIColor, glow: Bool) -> SCNNode {
         let box = SCNBox(
             width: CGFloat(0.62 * playScale),
             height: CGFloat(0.14 * playScale),
@@ -617,17 +705,17 @@ final class BoardSceneController: NSObject {
         )
         let material = PaperStyle.waxMaterial(color: color)
         if glow {
-            material.emission.contents = color.withAlphaComponent(0.55)
+            material.emission.contents = color.withAlphaComponent(0.9)
         }
         box.materials = [material]
         let node = SCNNode(geometry: box)
 
         let motif = SCNShape(path: PaperStyle.starPath(scale: CGFloat(playScale)), extrusionDepth: CGFloat(0.03 * playScale))
-        let motifMat = PaperStyle.waxMaterial(color: UIColor(red: 0.95, green: 0.82, blue: 0.45, alpha: 1))
+        let motifMat = PaperStyle.waxMaterial(color: motifColor)
         motifMat.metalness.contents = 0.35
         motifMat.roughness.contents = 0.28
         if glow {
-            motifMat.emission.contents = UIColor(red: 0.95, green: 0.82, blue: 0.45, alpha: 0.45)
+            motifMat.emission.contents = motifColor.withAlphaComponent(0.85)
         }
         motif.materials = [motifMat]
         let motifNode = SCNNode(geometry: motif)
@@ -645,4 +733,30 @@ final class BoardSceneController: NSObject {
     }
 
     private func cellKey(row: Int, col: Int) -> String { "\(row)_\(col)" }
+
+    private func clearWinHighlight() {
+        for node in sealNodes.values {
+            node.removeAction(forKey: "winPulse")
+            node.opacity = 1
+            node.scale = SCNVector3(1, 1, 1)
+        }
+    }
+
+    private func showWin(line: [Position], model: BoardModel) {
+        let keys = Set(line.map { cellKey(row: $0.row, col: $0.col) })
+        for (key, node) in sealNodes {
+            if keys.contains(key) { continue }
+            node.opacity = 0.28
+        }
+        for position in line {
+            let key = cellKey(row: position.row, col: position.col)
+            updateSeal(key: key, cell: model.cells[position.row][position.col], glow: true)
+            guard let seal = sealNodes[key] else { continue }
+            seal.position.y = 0.2 * playScale
+            seal.scale = SCNVector3(1.16, 1.16, 1.16)
+            let lift = SCNAction.moveBy(x: 0, y: Double(0.07 * playScale), z: 0, duration: 0.42)
+            lift.timingMode = .easeInEaseOut
+            seal.runAction(.repeatForever(.sequence([lift, lift.reversed()])), forKey: "winPulse")
+        }
+    }
 }

@@ -8,6 +8,7 @@ enum PaperStyle {
     static let cellWell = UIColor(red: 0.93, green: 0.87, blue: 0.77, alpha: 1)
     static let paperEdge = UIColor(red: 0.90, green: 0.84, blue: 0.72, alpha: 1)
     static let studio = UIColor(red: 0.16, green: 0.12, blue: 0.09, alpha: 1)
+    static let darkCanvas = UIColor(red: 0.10, green: 0.08, blue: 0.07, alpha: 1)
     static let ink = UIColor(red: 0.24, green: 0.16, blue: 0.12, alpha: 1)
     static let waxRed = UIColor(red: 0.69, green: 0.13, blue: 0.18, alpha: 1)
     static let waxIndigo = UIColor(red: 0.18, green: 0.16, blue: 0.42, alpha: 1)
@@ -56,6 +57,44 @@ enum PaperStyle {
         material.diffuse.wrapT = .repeat
         if dark {
             material.multiply.contents = UIColor(red: 0.78, green: 0.80, blue: 0.82, alpha: 1)
+        }
+        return material
+    }
+
+    static let waxBlack = UIColor(red: 0.10, green: 0.09, blue: 0.08, alpha: 1)
+    static let waxWhite = UIColor(red: 0.95, green: 0.95, blue: 0.96, alpha: 1)
+
+    static func waxColor(for player: Player, palette: SealPalette) -> UIColor {
+        switch (palette, player) {
+        case (.classic, .red): waxRed
+        case (.classic, .indigo): waxIndigo
+        case (.mono, .red): waxBlack
+        case (.mono, .indigo): waxWhite
+        }
+    }
+
+    static func tableMaterial(_ finish: TableFinish) -> SCNMaterial {
+        let material = woodMaterial()
+        switch finish {
+        case .walnut:
+            break
+        case .ebony:
+            material.multiply.contents = UIColor(red: 0.30, green: 0.24, blue: 0.20, alpha: 1)
+        case .oak:
+            material.multiply.contents = UIColor(red: 0.95, green: 0.78, blue: 0.52, alpha: 1)
+        }
+        return material
+    }
+
+    static func tabletMaterial(_ finish: TabletFinish, recessed: Bool, offset: Float = 0) -> SCNMaterial {
+        let material = graniteMaterial(dark: recessed, offset: offset)
+        switch finish {
+        case .granite:
+            break
+        case .slate:
+            material.multiply.contents = UIColor(red: 0.52, green: 0.58, blue: 0.66, alpha: 1)
+        case .sand:
+            material.multiply.contents = UIColor(red: 0.90, green: 0.80, blue: 0.64, alpha: 1)
         }
         return material
     }

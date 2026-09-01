@@ -18,6 +18,18 @@ final class SettingsStore {
     var hasCompletedOnboarding: Bool {
         didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: Keys.onboarding) }
     }
+    var boardDark: Bool {
+        didSet { UserDefaults.standard.set(boardDark, forKey: Keys.boardDark) }
+    }
+    var sealPalette: SealPalette {
+        didSet { UserDefaults.standard.set(sealPalette.rawValue, forKey: Keys.sealPalette) }
+    }
+    var tableFinish: TableFinish {
+        didSet { UserDefaults.standard.set(tableFinish.rawValue, forKey: Keys.tableFinish) }
+    }
+    var tabletFinish: TabletFinish {
+        didSet { UserDefaults.standard.set(tabletFinish.rawValue, forKey: Keys.tabletFinish) }
+    }
 
     init() {
         let defaults = UserDefaults.standard
@@ -26,6 +38,10 @@ final class SettingsStore {
         aiLevel = AILevel(rawValue: defaults.string(forKey: Keys.ai) ?? "") ?? .medium
         language = LanguageOverride(rawValue: defaults.string(forKey: Keys.language) ?? "") ?? .system
         hasCompletedOnboarding = defaults.bool(forKey: Keys.onboarding)
+        boardDark = defaults.bool(forKey: Keys.boardDark)
+        sealPalette = SealPalette(rawValue: defaults.string(forKey: Keys.sealPalette) ?? "") ?? .classic
+        tableFinish = TableFinish(rawValue: defaults.string(forKey: Keys.tableFinish) ?? "") ?? .walnut
+        tabletFinish = TabletFinish(rawValue: defaults.string(forKey: Keys.tabletFinish) ?? "") ?? .granite
     }
 
     private enum Keys {
@@ -34,6 +50,10 @@ final class SettingsStore {
         static let ai = "waxline.ai"
         static let language = "waxline.language"
         static let onboarding = "waxline.onboarding"
+        static let boardDark = "waxline.boardDark"
+        static let sealPalette = "waxline.sealPalette"
+        static let tableFinish = "waxline.tableFinish"
+        static let tabletFinish = "waxline.tabletFinish"
     }
 }
 

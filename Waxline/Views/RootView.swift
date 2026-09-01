@@ -8,6 +8,29 @@ enum Theme {
     static let waxRed = Color(red: 0.69, green: 0.13, blue: 0.18)
     static let waxIndigo = Color(red: 0.18, green: 0.16, blue: 0.42)
     static let gold = Color(red: 0.72, green: 0.55, blue: 0.28)
+    static let waxBlack = Color(red: 0.10, green: 0.09, blue: 0.08)
+    static let waxWhite = Color(red: 0.95, green: 0.95, blue: 0.96)
+
+    static func canvas(dark: Bool) -> Color {
+        dark ? Color(red: 0.10, green: 0.08, blue: 0.07) : cream
+    }
+
+    static func ink(dark: Bool) -> Color {
+        dark ? Color(red: 0.93, green: 0.88, blue: 0.80) : ink
+    }
+
+    static func chipFill(dark: Bool) -> Color {
+        dark ? Color(red: 0.18, green: 0.15, blue: 0.12) : cream.opacity(0.94)
+    }
+
+    static func seal(_ player: Player, palette: SealPalette) -> Color {
+        switch (palette, player) {
+        case (.classic, .red): waxRed
+        case (.classic, .indigo): waxIndigo
+        case (.mono, .red): waxBlack
+        case (.mono, .indigo): waxWhite
+        }
+    }
 }
 
 struct RootView: View {

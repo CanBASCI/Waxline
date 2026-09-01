@@ -123,15 +123,15 @@
     "phase_rotate" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose a quadrant, then rotate" } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bir kadran seç, sonra çevir" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Swipe a tablet to rotate" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tableti kaydırarak çevir" } }
       }
     },
     "rotate_hint" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rotate a quadrant" } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bir kadranı çevir" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Swipe a tablet to rotate" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tableti kaydırarak çevir" } }
       }
     },
     "step_place" : {
@@ -270,8 +270,8 @@
     "onboarding_quadrant" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose one of the four quadrants." } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dört kadrandan birini seç." } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Swipe the tablet you want to turn." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çevirmek istediğin tableti kaydır." } }
       }
     },
     "onboarding_rotate" : {
@@ -342,6 +342,118 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "3D" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "3D" } }
+      }
+    },
+    "look_settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Board look" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tahta görünümü" } }
+      }
+    },
+    "look_light" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Light" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Açık" } }
+      }
+    },
+    "look_dark" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dark" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Koyu" } }
+      }
+    },
+    "seal_classic" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Red · Indigo" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kırmızı · Çivit" } }
+      }
+    },
+    "seal_mono" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Black · White" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Siyah · Beyaz" } }
+      }
+    },
+    "tablet_granite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Granite" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Granit" } }
+      }
+    },
+    "tablet_slate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Slate" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Arduvaz" } }
+      }
+    },
+    "tablet_sand" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sand" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kum" } }
+      }
+    },
+    "table_walnut" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Walnut" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ceviz" } }
+      }
+    },
+    "table_ebony" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ebony" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Abanoz" } }
+      }
+    },
+    "table_oak" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Oak" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Meşe" } }
+      }
+    },
+    "turn_black" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Black's turn" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Siyahın sırası" } }
+      }
+    },
+    "turn_white" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "White's turn" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Beyazın sırası" } }
+      }
+    },
+    "black_wins" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Black wins" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Siyah kazandı" } }
+      }
+    },
+    "white_wins" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "White wins" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Beyaz kazandı" } }
+      }
+    },
+    "waiting_white" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "White is thinking…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Beyaz düşünüyor…" } }
       }
     }
   },

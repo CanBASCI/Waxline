@@ -78,3 +78,28 @@ enum LanguageOverride: String, Sendable, Codable, CaseIterable, Identifiable {
         }
     }
 }
+
+enum SealPalette: String, Sendable, Codable, CaseIterable {
+    case classic
+    case mono
+}
+
+enum TableFinish: String, Sendable, Codable, CaseIterable {
+    case walnut
+    case ebony
+    case oak
+}
+
+enum TabletFinish: String, Sendable, Codable, CaseIterable {
+    case granite
+    case slate
+    case sand
+}
+
+extension CaseIterable where Self: Equatable {
+    mutating func cycle() {
+        let all = Array(Self.allCases)
+        guard let index = all.firstIndex(of: self) else { return }
+        self = all[(index + 1) % all.count]
+    }
+}

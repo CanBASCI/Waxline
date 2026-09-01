@@ -18,7 +18,7 @@ struct ResultSheet: View {
                 .padding(.top, 12)
             Text(title)
                 .font(.system(.title, design: .serif).weight(.semibold))
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Theme.ink(dark: isDark))
                 .multilineTextAlignment(.center)
             HStack(spacing: 12) {
                 if game.mode != .gameCenter {
@@ -26,15 +26,18 @@ struct ResultSheet: View {
                         .buttonStyle(WaxButtonStyle(fill: Theme.waxRed))
                 }
                 Button(t("menu"), action: onMenu)
-                    .buttonStyle(WaxButtonStyle(fill: Theme.ink))
+                    .buttonStyle(WaxButtonStyle(fill: Theme.ink(dark: isDark), label: isDark ? Theme.canvas(dark: true) : Theme.cream))
             }
             .padding(.horizontal, 20)
             Spacer()
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.cream)
+        .background(Theme.canvas(dark: isDark))
+        .preferredColorScheme(isDark ? .dark : .light)
     }
+
+    private var isDark: Bool { settings.boardDark }
 
     private var title: String {
         switch game.status {
@@ -50,6 +53,9 @@ struct ResultSheet: View {
                 let local = gameCenter.localPlayerColor(in: match)
                 return player == local ? t("you_win") : t("you_lose")
             }
+            if settings.sealPalette == .mono {
+                return player == .red ? t("black_wins") : t("white_wins")
+            }
             return player == .red ? t("red_wins") : t("indigo_wins")
         }
     }
@@ -57,7 +63,7 @@ struct ResultSheet: View {
     private var badgeColor: Color {
         switch game.status {
         case .won(let player, _):
-            player == .red ? Theme.waxRed : Theme.waxIndigo
+            Theme.seal(player, palette: settings.sealPalette)
         default:
             Theme.gold
         }
@@ -66,11 +72,12 @@ struct ResultSheet: View {
 
 struct WaxButtonStyle: ButtonStyle {
     var fill: Color
+    var label: Color = Theme.cream
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(.headline, design: .serif).weight(.semibold))
-            .foregroundStyle(Theme.cream)
+            .foregroundStyle(label)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(fill.opacity(configuration.isPressed ? 0.8 : 1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
