@@ -88,11 +88,11 @@ enum PaperStyle {
         ]
     }
 
-    static func starPath() -> UIBezierPath {
+    static func starPath(scale: CGFloat = 1) -> UIBezierPath {
         let path = UIBezierPath()
         let points = 8
-        let outer: CGFloat = 0.22
-        let inner: CGFloat = 0.09
+        let outer: CGFloat = 0.22 * scale
+        let inner: CGFloat = 0.09 * scale
         for i in 0..<(points * 2) {
             let radius = i.isMultiple(of: 2) ? outer : inner
             let angle = CGFloat(i) * .pi / CGFloat(points) - .pi / 2
