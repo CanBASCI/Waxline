@@ -10,7 +10,7 @@ struct GameView: View {
     @State private var selectedQuadrant: Quadrant?
     @State private var busy = false
     @State private var showResult = false
-    @State private var is3DView = true
+    @State private var is3DView = false
     @State private var showLookPanel = false
     @State private var resultTask: Task<Void, Never>?
 
@@ -33,7 +33,11 @@ struct GameView: View {
                     if showLookPanel {
                         Color.clear
                             .contentShape(Rectangle())
-                            .onTapGesture { showLookPanel = false }
+                            .onTapGesture {
+                                withAnimation(.easeOut(duration: 0.25)) {
+                                    showLookPanel = false
+                                }
+                            }
                     }
                 }
                 .overlay(alignment: .topLeading) {
@@ -149,7 +153,9 @@ struct GameView: View {
     private var lookMenu: some View {
         HStack(alignment: .center, spacing: 6) {
             Button {
-                showLookPanel.toggle()
+                withAnimation(.easeOut(duration: 0.25)) {
+                    showLookPanel.toggle()
+                }
                 HapticsService.select(enabled: settings.hapticsEnabled)
             } label: {
                 Image(systemName: showLookPanel ? "gearshape.fill" : "gearshape")
@@ -164,30 +170,33 @@ struct GameView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(t("look_settings"))
 
-            if showLookPanel {
-                HStack(spacing: 6) {
-                    lookChip(isDark ? t("look_dark") : t("look_light")) {
-                        settings.boardDark.toggle()
-                        applyBoardLook()
+            ZStack(alignment: .leading) {
+                if showLookPanel {
+                    HStack(spacing: 6) {
+                        lookChip(isDark ? t("look_dark") : t("look_light")) {
+                            settings.boardDark.toggle()
+                            applyBoardLook()
+                        }
+                        lookChip(settings.sealPalette == .mono ? t("seal_mono") : t("seal_classic")) {
+                            settings.sealPalette.cycle()
+                            applyBoardLook()
+                            scene.syncBoard(game.model, winningLine: nil)
+                        }
+                        lookChip(t(tabletTitleKey)) {
+                            settings.tabletFinish.cycle()
+                            applyBoardLook()
+                        }
+                        lookChip(t(tableTitleKey)) {
+                            settings.tableFinish.cycle()
+                            applyBoardLook()
+                        }
                     }
-                    lookChip(settings.sealPalette == .mono ? t("seal_mono") : t("seal_classic")) {
-                        settings.sealPalette.cycle()
-                        applyBoardLook()
-                        scene.syncBoard(game.model, winningLine: nil)
-                    }
-                    lookChip(t(tabletTitleKey)) {
-                        settings.tabletFinish.cycle()
-                        applyBoardLook()
-                    }
-                    lookChip(t(tableTitleKey)) {
-                        settings.tableFinish.cycle()
-                        applyBoardLook()
-                    }
+                    .transition(.move(edge: .leading).combined(with: .opacity))
                 }
-                .transition(.opacity.combined(with: .move(edge: .leading)))
             }
+            .clipped()
         }
-        .animation(.easeInOut(duration: 0.2), value: showLookPanel)
+        .animation(.easeOut(duration: 0.25), value: showLookPanel)
     }
 
     private func lookChip(_ title: String, action: @escaping () -> Void) -> some View {

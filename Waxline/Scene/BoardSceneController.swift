@@ -26,7 +26,7 @@ final class BoardSceneController: NSObject {
     private var cameraNode = SCNNode()
     private var panStartAngle: Float = 0
     private var restYaw: Float = 0
-    private var cameraTilt: Float = 1
+    private var cameraTilt: Float = 0
     private var panStartTabletYaw: Float = 0
     private var panTabletCenter = SIMD2<Float>.zero
     private var panGrabCorner = SIMD2<Float>.zero
