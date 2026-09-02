@@ -34,6 +34,7 @@ final class BoardSceneController: NSObject {
     private var panUnwrappedDelta: Float = 0
     private var panQuadrant: Quadrant?
     private var panRotatingTablet = false
+    private var panSpinningTable = false
     private var lastViewSize = CGSize(width: 390, height: 520)
 
     private let playScale: Float = 1.10
@@ -43,6 +44,8 @@ final class BoardSceneController: NSObject {
     private let viewFitHalf: Float = 3.6
     private let tabletThick: Float = 0.68
     private let tableSpinScale: Float = 0.86
+    private let boardScreenLift: Float = 0.60
+    private var boardRestPosition: SCNVector3 { SCNVector3(0, 0, -boardScreenLift) }
     private var sheetPad: Float { 0.08 * playScale }
     private var slab: Float { playScale * tabletThick }
 
@@ -52,12 +55,41 @@ final class BoardSceneController: NSObject {
     }
 
     func setInteraction(canPlace: Bool, canSelectQuadrant: Bool) {
+        if !canSelectQuadrant {
+            abandonTabletDrag()
+        }
         allowsCellTaps = canPlace && !isAnimating
         allowsQuadrantTaps = canSelectQuadrant && !isAnimating
         stopRotateInvite()
         poseTablets(canSelect: canSelectQuadrant)
         if canSelectQuadrant, selectedQuadrant == nil {
             startRotateInvite()
+        }
+    }
+
+    func abandonTabletDrag() {
+        let wasSpinningTable = panSpinningTable
+        let wasHoldingTablet = panRotatingTablet || selectedQuadrant != nil
+        panRotatingTablet = false
+        panSpinningTable = false
+        panQuadrant = nil
+        panTabletDelta = 0
+        panUnwrappedDelta = 0
+        selectedQuadrant = nil
+        onQuadrantTap?(nil)
+        guard wasHoldingTablet || wasSpinningTable else { return }
+        if !isAnimating {
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 0.22
+            SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            for node in quadrantNodes.values {
+                node.eulerAngles.y = 0
+            }
+            SCNTransaction.commit()
+            poseTablets(canSelect: false)
+        }
+        if wasSpinningTable {
+            snapBoard(to: restYaw)
         }
     }
 
@@ -208,14 +240,14 @@ final class BoardSceneController: NSObject {
     }
 
     func beginPan() {
-        boardRoot.position = SCNVector3Zero
+        boardRoot.position = boardRestPosition
         panStartAngle = restYaw
         panStartTabletYaw = 0
         panTabletDelta = 0
     }
 
-    private func beginTablePan(at viewPoint: CGPoint, in view: SCNView) {
-        boardRoot.position = SCNVector3Zero
+    func beginTablePan(at viewPoint: CGPoint, in view: SCNView) {
+        boardRoot.position = boardRestPosition
         panStartAngle = restYaw
         panTabletDelta = 0
         panUnwrappedDelta = 0
@@ -231,12 +263,12 @@ final class BoardSceneController: NSObject {
         SCNTransaction.commit()
     }
 
-    private func updateTablePan(at viewPoint: CGPoint, in view: SCNView) {
+    func updateTablePan(at viewPoint: CGPoint, in view: SCNView) {
         guard !isAnimating else { return }
         guard let now = worldXZ(from: viewPoint, in: view) else { return }
         let vector = now - panTabletCenter
         guard simd_length(vector) > 0.12 else { return }
-        boardRoot.position = SCNVector3Zero
+        boardRoot.position = boardRestPosition
         let angle = fingerAngle(at: now, center: panTabletCenter)
         panUnwrappedDelta += wrappedDelta(from: panLastFingerAngle, to: angle)
         panLastFingerAngle = angle
@@ -245,7 +277,7 @@ final class BoardSceneController: NSObject {
         boardRoot.eulerAngles.y = panStartAngle + panTabletDelta
     }
 
-    private func endTablePan() {
+    func endTablePan() {
         guard !isAnimating else {
             snapBoard(to: restYaw)
             return
@@ -271,7 +303,7 @@ final class BoardSceneController: NSObject {
     }
 
     private func updateTabletPan(at viewPoint: CGPoint, in view: SCNView) {
-        guard !isAnimating, let quadrant = panQuadrant, let node = quadrantNodes[quadrant] else { return }
+        guard !isAnimating, allowsQuadrantTaps, let quadrant = panQuadrant, let node = quadrantNodes[quadrant] else { return }
         guard let now = boardXZ(from: viewPoint, in: view) else { return }
         let vector = now - panTabletCenter
         guard simd_length(vector) > 0.12 else { return }
@@ -284,7 +316,7 @@ final class BoardSceneController: NSObject {
     }
 
     private func endTabletPan() {
-        guard !isAnimating else { return }
+        guard allowsQuadrantTaps, !isAnimating else { return }
         if abs(panTabletDelta) > 0.28, let quadrant = panQuadrant {
             onRotateGesture?(quadrant, panTabletDelta < 0)
             return
@@ -330,27 +362,32 @@ final class BoardSceneController: NSObject {
         case .began:
             beginPan()
             panRotatingTablet = false
+            panSpinningTable = false
             panQuadrant = nil
             if allowsQuadrantTaps, let world = boardPoint(from: location, in: view), let quadrant = quadrant(at: world) {
                 panQuadrant = quadrant
                 panRotatingTablet = true
                 beginTabletPan(at: location, in: view)
+            } else if let world = boardPoint(from: location, in: view), isOnTable(world) {
+                break
             } else {
+                panSpinningTable = true
                 beginTablePan(at: location, in: view)
             }
         case .changed:
             if panRotatingTablet {
                 updateTabletPan(at: location, in: view)
-            } else {
+            } else if panSpinningTable {
                 updateTablePan(at: location, in: view)
             }
         case .ended, .cancelled, .failed:
             if panRotatingTablet {
                 endTabletPan()
-            } else {
+            } else if panSpinningTable {
                 endTablePan()
             }
             panRotatingTablet = false
+            panSpinningTable = false
             panQuadrant = nil
         default:
             break
@@ -361,7 +398,7 @@ final class BoardSceneController: NSObject {
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0.38
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        boardRoot.position = SCNVector3Zero
+        boardRoot.position = boardRestPosition
         boardRoot.eulerAngles.y = yaw
         boardRoot.scale = SCNVector3(1, 1, 1)
         SCNTransaction.commit()
@@ -416,6 +453,12 @@ final class BoardSceneController: NSObject {
         )
     }
 
+    private func isOnTable(_ world: SCNVector3) -> Bool {
+        let local = boardRoot.convertPosition(world, from: nil)
+        let half = tableSize / 2
+        return abs(local.x) <= half && abs(local.z) <= half
+    }
+
     private func cell(at world: SCNVector3) -> Position? {
         let local = boardRoot.convertPosition(world, from: nil)
         for quadrant in Quadrant.allCases {
@@ -432,11 +475,22 @@ final class BoardSceneController: NSObject {
     }
 
     private func quadrant(at world: SCNVector3) -> Quadrant? {
-        guard let position = cell(at: world) else { return nil }
-        if position.row < 3 {
-            return position.col < 3 ? .nw : .ne
+        let local = boardRoot.convertPosition(world, from: nil)
+        let half = (cellSize * 3 + sheetPad) / 2 + 0.1
+        var best: Quadrant?
+        var bestDist = Float.greatestFiniteMagnitude
+        for quadrant in Quadrant.allCases {
+            guard let node = quadrantNodes[quadrant] else { continue }
+            let dx = local.x - node.position.x
+            let dz = local.z - node.position.z
+            guard abs(dx) <= half, abs(dz) <= half else { continue }
+            let dist = dx * dx + dz * dz
+            if dist < bestDist {
+                bestDist = dist
+                best = quadrant
+            }
         }
-        return position.col < 3 ? .sw : .se
+        return best
     }
 
     func selectQuadrant(_ quadrant: Quadrant?) {
@@ -449,6 +503,7 @@ final class BoardSceneController: NSObject {
         scene.lightingEnvironment.contents = PaperStyle.waxLightingCube()
         scene.lightingEnvironment.intensity = 0.45
         scene.rootNode.addChildNode(boardRoot)
+        boardRoot.position = boardRestPosition
 
         let ambient = SCNNode()
         ambient.light = SCNLight()
@@ -532,7 +587,7 @@ final class BoardSceneController: NSObject {
         ]
         var maxTanX: Float = 0.001
         for corner in corners {
-            let world = boardRoot.convertPosition(corner, to: nil)
+            let world = boardRoot.convertVector(corner, to: nil)
             let local = cameraNode.convertPosition(world, from: nil)
             let depth = max(-local.z, 0.05)
             maxTanX = max(maxTanX, abs(local.x) / depth)

@@ -96,6 +96,22 @@ enum TabletFinish: String, Sendable, Codable, CaseIterable {
     case sand
 }
 
+struct LastMove: Sendable, Equatable, Identifiable {
+    let id: UUID
+    var player: Player
+    var position: Position
+    var quadrant: Quadrant?
+    var clockwise: Bool?
+
+    init(player: Player, position: Position, quadrant: Quadrant?, clockwise: Bool?) {
+        self.id = UUID()
+        self.player = player
+        self.position = position
+        self.quadrant = quadrant
+        self.clockwise = clockwise
+    }
+}
+
 extension CaseIterable where Self: Equatable {
     mutating func cycle() {
         let all = Array(Self.allCases)

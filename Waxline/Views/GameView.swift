@@ -13,7 +13,13 @@ struct GameView: View {
     @State private var is3DView = false
     @State private var showLookPanel = false
     @State private var resultTask: Task<Void, Never>?
+    @State private var timerTask: Task<Void, Never>?
+    @State private var turnSecondsLeft = 15
+    @State private var boardRect: CGRect = .zero
+    @State private var tableSpinActive = false
     private let boardGutter: CGFloat = 30
+    private let boardBottomTrim: CGFloat = 40
+    private let turnTimeLimit = 15
 
     private func t(_ key: String.LocalizationValue) -> String {
         L10n.text(key, language: settings.language)
@@ -22,15 +28,14 @@ struct GameView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            turnBanner
             BoardSceneView(controller: scene)
                 .aspectRatio(0.72, contentMode: .fit)
                 .frame(maxWidth: .infinity)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, -boardBottomTrim)
+                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(ink.opacity(0.55), lineWidth: 2)
-                        .allowsHitTesting(false)
-                }
                 .overlay {
                     if showLookPanel {
                         Color.clear
@@ -42,26 +47,31 @@ struct GameView: View {
                             }
                     }
                 }
-                .overlay(alignment: .topLeading) {
-                    lookMenu
-                        .padding(10)
+                .overlay(alignment: .bottom) {
+                    boardStatus
                 }
-                .overlay(alignment: .topTrailing) {
-                    perspectiveChip
-                        .padding(10)
+                .background {
+                    GeometryReader { geo in
+                        Color.clear.preference(key: BoardRectKey.self, value: geo.frame(in: .named("gameCanvas")))
+                    }
                 }
                 .padding(.horizontal, 14)
-                .padding(.top, boardGutter)
+                .padding(.top, 0)
                 .padding(.bottom, boardGutter)
-            turnBanner
             footer
             Spacer(minLength: 0)
         }
+        .coordinateSpace(name: "gameCanvas")
+        .onPreferenceChange(BoardRectKey.self) { boardRect = $0 }
+        .contentShape(Rectangle())
+        .simultaneousGesture(tableSpinGesture)
         .background(canvas.ignoresSafeArea())
         .preferredColorScheme(isDark ? .dark : .light)
         .onAppear { configureScene() }
         .onChange(of: game.status) { _, newStatus in
             if newStatus != .playing {
+                stopTurnTimer()
+                scene.abandonTabletDrag()
                 highlightWin()
                 HapticsService.win(enabled: settings.hapticsEnabled)
                 SoundService.win(enabled: settings.soundEnabled)
@@ -80,15 +90,20 @@ struct GameView: View {
             ResultSheet(game: game, onAgain: replay, onMenu: onExit)
                 .presentationDetents([.height(240)])
         }
-        .onDisappear { resultTask?.cancel() }
+        .onDisappear {
+            resultTask?.cancel()
+            stopTurnTimer()
+            finishTableSpin()
+        }
     }
 
     private var header: some View {
         HStack {
             Button(t("menu")) { onExit() }
-                .font(.system(.body, design: .serif).weight(.medium))
+                .font(bannerFont)
                 .foregroundStyle(ink)
-            Spacer()
+            Spacer(minLength: 8)
+            lookMenu
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
@@ -103,83 +118,208 @@ struct GameView: View {
     }
 
     private var turnBanner: some View {
-        VStack(spacing: 7) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .center, spacing: 8) {
                 SealMark(color: currentColor, motif: sealMotif, outline: sealOutline)
                     .frame(width: 22, height: 22)
                 Text(turnTitle)
-                    .font(.system(.headline, design: .serif))
+                    .font(bannerFont)
                     .foregroundStyle(titleColor)
+                Spacer(minLength: 8)
+                if showsTurnTimer {
+                    Text("\(max(turnSecondsLeft, 1))")
+                        .font(.system(.title2, design: .serif).weight(.medium))
+                        .monospacedDigit()
+                        .foregroundStyle(turnTimerColor)
+                        .frame(minWidth: 28, alignment: .center)
+                        .opacity(isHumanTurn && turnSecondsLeft > 0 ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.18), value: turnSecondsLeft)
+                        .accessibilityLabel(t("turn_timer"))
+                        .accessibilityValue("\(turnSecondsLeft)")
+                        .accessibilityHidden(!(isHumanTurn && turnSecondsLeft > 0))
+                }
             }
-            if game.status == .playing {
-                turnSteps
+            HStack(alignment: .center, spacing: 8) {
+                if game.status == .playing {
+                    turnSteps
+                }
+                Spacer(minLength: 8)
+                if showsPerspectiveChip {
+                    perspectiveChip
+                }
             }
         }
-        .padding(.top, 0)
-        .padding(.bottom, 0)
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.top, boardGutter)
+        .padding(.bottom, boardGutter)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var footer: some View {
-        VStack(spacing: 12) {
-            if game.phase == .rotate, canAct, !busy {
-                Text(t("rotate_hint"))
-                    .font(.system(.subheadline, design: .serif))
-                    .foregroundStyle(ink.opacity(0.7))
-                HStack(spacing: 20) {
-                    rotateButton(t("rotate_ccw"), clockwise: false)
-                    rotateButton(t("rotate_cw"), clockwise: true)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(game.moveLog.enumerated()), id: \.element.id) { index, move in
+                    Text(moveLine(move))
+                        .font(.system(.subheadline, design: .serif).weight(index == 0 ? .medium : .regular))
+                        .foregroundStyle(ink.opacity(moveLogOpacity(index)))
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .opacity(selectedQuadrant == nil ? 0.35 : 1)
-                .disabled(selectedQuadrant == nil)
-            } else if busy, isAIThinking {
-                Text(t(settings.sealPalette == .mono ? "waiting_white" : "waiting_ai"))
-                    .font(.system(.subheadline, design: .serif))
-                    .foregroundStyle(ink.opacity(0.7))
-            } else if game.mode == .gameCenter, !isLocalTurn {
-                Text(t("turn_waiting"))
-                    .font(.system(.subheadline, design: .serif))
-                    .foregroundStyle(ink.opacity(0.7))
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            sealReserve
         }
-        .frame(minHeight: 48)
-        .padding(.top, 14)
-        .padding(.bottom, 8)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if showLookPanel { showLookPanel = false }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 12)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(t("last_move"))
+        .accessibilityValue(game.moveLog.map(moveLine).joined(separator: ", "))
+    }
+
+    private var sealReserve: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            sealPiles(for: .red)
+            sealPiles(for: .indigo)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(t("seal_reserve"))
+        .accessibilityValue(
+            "\(remainingSeals(for: .red)), \(remainingSeals(for: .indigo))"
+        )
+    }
+
+    private func sealPiles(for player: Player) -> some View {
+        HStack(spacing: 5) {
+            ForEach(0..<3, id: \.self) { pile in
+                sealPile(count: pileCount(for: player, pile: pile), player: player)
+            }
         }
     }
 
+    private func sealPile(count: Int, player: Player) -> some View {
+        let size: CGFloat = 16
+        let step: CGFloat = 3
+        return ZStack(alignment: .bottom) {
+            ForEach(0..<count, id: \.self) { index in
+                SealMark(
+                    color: Theme.seal(player, palette: settings.sealPalette),
+                    motif: reserveMotif(player),
+                    outline: stackEdge(for: player),
+                    outlineWidth: 1.2
+                )
+                .frame(width: size, height: size)
+                .offset(y: -CGFloat(index) * step)
+            }
+        }
+        .frame(width: size, height: size + step * 5, alignment: .bottom)
+    }
+
+    private func remainingSeals(for player: Player) -> Int {
+        let placed = game.cells.reduce(0) { sum, row in
+            sum + row.filter { $0 == player.cell }.count
+        }
+        return max(0, 18 - placed)
+    }
+
+    private func pileCount(for player: Player, pile: Int) -> Int {
+        let remaining = remainingSeals(for: player)
+        return min(6, max(0, remaining - pile * 6))
+    }
+
+    private func reserveMotif(_ player: Player) -> Color {
+        if settings.sealPalette == .mono, player == .indigo {
+            return Theme.waxBlack
+        }
+        return Theme.gold
+    }
+
+    private func stackEdge(for player: Player) -> Color {
+        let isWhite = settings.sealPalette == .mono && player == .indigo
+        return isWhite ? Theme.waxBlack : Theme.cream
+    }
+
+    private var boardStatus: some View {
+        Group {
+            if let message = boardStatusText {
+                Text(message)
+                    .font(.system(.subheadline, design: .serif))
+                    .foregroundStyle(ink.opacity(0.7))
+                    .padding(.bottom, 16)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .allowsHitTesting(false)
+    }
+
+    private var boardStatusText: String? {
+        if canAct, !busy {
+            if game.phase == .place {
+                return t("place_hint")
+            }
+            if game.phase == .rotate {
+                return t("rotate_hint")
+            }
+        }
+        if busy, isAIThinking {
+            return t(settings.sealPalette == .mono ? "waiting_white" : "waiting_ai")
+        }
+        if game.mode == .gameCenter, !isLocalTurn {
+            return t("turn_waiting")
+        }
+        return nil
+    }
+
+    private var tableSpinGesture: some Gesture {
+        DragGesture(minimumDistance: 10, coordinateSpace: .named("gameCanvas"))
+            .onChanged { value in
+                guard boardRect.width > 8, !boardRect.contains(value.startLocation) else { return }
+                guard let view = scene.scnView else { return }
+                let point = CGPoint(
+                    x: value.location.x - boardRect.minX,
+                    y: value.location.y - boardRect.minY
+                )
+                if tableSpinActive {
+                    scene.updateTablePan(at: point, in: view)
+                } else {
+                    tableSpinActive = true
+                    scene.beginTablePan(at: point, in: view)
+                }
+            }
+            .onEnded { _ in
+                finishTableSpin()
+            }
+    }
+
+    private func finishTableSpin() {
+        guard tableSpinActive else { return }
+        tableSpinActive = false
+        scene.endTablePan()
+    }
+
     private var perspectiveChip: some View {
-        lookChip(is3DView ? t("view_3d") : t("view_2d")) {
+        Button {
             is3DView.toggle()
             scene.setPerspective3D(is3DView)
+            HapticsService.select(enabled: settings.hapticsEnabled)
+        } label: {
+            Text(is3DView ? t("view_3d") : t("view_2d"))
+                .font(.system(.subheadline, design: .serif).weight(.medium))
+                .foregroundStyle(ink)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .overlay {
+                    Capsule().stroke(ink.opacity(0.35), lineWidth: 1)
+                }
         }
+        .buttonStyle(.plain)
         .accessibilityLabel(is3DView ? t("view_3d") : t("view_2d"))
     }
 
     private var lookMenu: some View {
         HStack(alignment: .center, spacing: 6) {
-            Button {
-                withAnimation(.easeOut(duration: 0.25)) {
-                    showLookPanel.toggle()
-                }
-                HapticsService.select(enabled: settings.hapticsEnabled)
-            } label: {
-                Image(systemName: showLookPanel ? "gearshape.fill" : "gearshape")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(ink)
-                    .frame(width: 32, height: 32)
-                    .background(Theme.chipFill(dark: isDark), in: Circle())
-                    .overlay {
-                        Circle().stroke(ink.opacity(0.35), lineWidth: 1)
-                    }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(t("look_settings"))
-
-            ZStack(alignment: .leading) {
+            ZStack(alignment: .trailing) {
                 if showLookPanel {
                     HStack(spacing: 6) {
                         lookChip(isDark ? t("look_dark") : t("look_light")) {
@@ -200,10 +340,28 @@ struct GameView: View {
                             applyBoardLook()
                         }
                     }
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
             .clipped()
+
+            Button {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    showLookPanel.toggle()
+                }
+                HapticsService.select(enabled: settings.hapticsEnabled)
+            } label: {
+                Image(systemName: showLookPanel ? "gearshape.fill" : "gearshape")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(ink)
+                    .frame(width: 32, height: 32)
+                    .background(Theme.chipFill(dark: isDark), in: Circle())
+                    .overlay {
+                        Circle().stroke(ink.opacity(0.35), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(t("look_settings"))
         }
         .animation(.easeOut(duration: 0.25), value: showLookPanel)
     }
@@ -226,24 +384,13 @@ struct GameView: View {
         .buttonStyle(.plain)
     }
 
-    private func rotateButton(_ title: String, clockwise: Bool) -> some View {
-        Button {
-            applyRotation(clockwise: clockwise)
-        } label: {
-            Label(title, systemImage: clockwise ? "arrow.clockwise" : "arrow.counterclockwise")
-                .font(.system(.title3, design: .serif).weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .foregroundStyle(canvas)
-                .background(ink, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 8)
-    }
-
     private var isDark: Bool { settings.boardDark }
     private var canvas: Color { Theme.canvas(dark: isDark) }
     private var ink: Color { Theme.ink(dark: isDark) }
+    private var bannerFont: Font { .system(.body, design: .serif).weight(.medium) }
+    private var turnTimerColor: Color {
+        turnSecondsLeft <= 5 ? Theme.waxRed : ink
+    }
 
     private var currentColor: Color {
         Theme.seal(game.currentPlayer, palette: settings.sealPalette)
@@ -308,11 +455,49 @@ struct GameView: View {
         return game.currentPlayer == .red ? t("turn_red") : t("turn_indigo")
     }
 
+    private func moveLine(_ move: LastMove) -> String {
+        let player: String
+        if settings.sealPalette == .mono {
+            player = move.player == .red ? t("player_black") : t("player_white")
+        } else {
+            player = move.player == .red ? t("player_red") : t("player_indigo")
+        }
+        let cell = cellName(move.position)
+        guard let quadrant = move.quadrant, let clockwise = move.clockwise else {
+            return "\(player)  ·  \(cell)"
+        }
+        let turn = clockwise ? t("last_right") : t("last_left")
+        return "\(player)  ·  \(cell)  ·  \(quadrantName(quadrant)) \(turn)"
+    }
+
+    private func moveLogOpacity(_ index: Int) -> Double {
+        switch index {
+        case 0: 0.75
+        case 1: 0.48
+        case 2: 0.30
+        default: 0.16
+        }
+    }
+
+    private func cellName(_ position: Position) -> String {
+        let column = Character(UnicodeScalar(65 + position.col)!)
+        return "\(column)\(position.row + 1)"
+    }
+
+    private func quadrantName(_ quadrant: Quadrant) -> String {
+        switch quadrant {
+        case .nw: t("quad_nw")
+        case .ne: t("quad_ne")
+        case .sw: t("quad_sw")
+        case .se: t("quad_se")
+        }
+    }
+
     private var turnSteps: some View {
         HStack(spacing: 8) {
             stepChip(t("step_place"), active: game.phase == .place)
             Image(systemName: "arrow.right")
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(.subheadline, design: .serif).weight(.medium))
                 .foregroundStyle(ink.opacity(0.35))
             stepChip(t("step_rotate"), active: game.phase == .rotate)
         }
@@ -321,7 +506,7 @@ struct GameView: View {
 
     private func stepChip(_ title: String, active: Bool) -> some View {
         Text(title)
-            .font(.system(.caption, design: .serif).weight(.semibold))
+            .font(.system(.subheadline, design: .serif).weight(.medium))
             .foregroundStyle(active ? onSeal : ink.opacity(0.55))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -333,13 +518,21 @@ struct GameView: View {
         return false
     }
 
+    private var isLocalPassPlay: Bool {
+        if case .local = game.mode { return true }
+        return false
+    }
+
+    private var showsTurnTimer: Bool { !isLocalPassPlay }
+    private var showsPerspectiveChip: Bool { !isLocalPassPlay }
+
     private var isLocalTurn: Bool {
         guard let match = gameCenter.activeMatch else { return true }
         return gameCenter.isLocalTurn(match)
     }
 
-    private var canAct: Bool {
-        guard game.status == .playing, !busy else { return false }
+    private var isHumanTurn: Bool {
+        guard game.status == .playing else { return false }
         switch game.mode {
         case .local:
             return true
@@ -349,6 +542,10 @@ struct GameView: View {
             guard let match = gameCenter.activeMatch else { return false }
             return gameCenter.isLocalTurn(match) && game.currentPlayer == gameCenter.localPlayerColor(in: match)
         }
+    }
+
+    private var canAct: Bool {
+        isHumanTurn && !busy
     }
 
     private func configureScene() {
@@ -366,9 +563,12 @@ struct GameView: View {
         }
         applyBoardLook()
         scene.syncBoard(game.model, winningLine: nil)
+        scene.setPerspective3D(isLocalPassPlay ? false : is3DView)
         refreshInteraction()
         if shouldStartAI {
             Task { await playAI() }
+        } else {
+            beginNextTurnClock()
         }
     }
 
@@ -398,11 +598,6 @@ struct GameView: View {
         refreshInteraction()
     }
 
-    private func applyRotation(clockwise: Bool) {
-        guard let quadrant = selectedQuadrant else { return }
-        applyRotation(quadrant: quadrant, clockwise: clockwise)
-    }
-
     private func applyRotation(quadrant: Quadrant, clockwise: Bool) {
         guard canAct else { return }
         busy = true
@@ -420,7 +615,10 @@ struct GameView: View {
             finishTurnIfNeeded()
             refreshInteraction()
             if shouldStartAI {
+                stopTurnTimer()
                 Task { await playAI() }
+            } else {
+                beginNextTurnClock()
             }
         }
     }
@@ -454,8 +652,10 @@ struct GameView: View {
         game.reset()
         selectedQuadrant = nil
         busy = false
+        scene.abandonTabletDrag()
         scene.syncBoard(game.model, winningLine: nil)
         refreshInteraction()
+        beginNextTurnClock()
     }
 
     private func reloadRemoteMatch() {
@@ -466,10 +666,18 @@ struct GameView: View {
             return nil
         }())
         refreshInteraction()
+        if isHumanTurn {
+            if timerTask == nil {
+                startTurnTimer()
+            }
+        } else {
+            stopTurnTimer()
+        }
     }
 
     private func playAI() async {
         guard case .ai(let level) = game.mode, game.currentPlayer == .indigo, game.status == .playing else { return }
+        scene.abandonTabletDrag()
         busy = true
         scene.setInteraction(canPlace: false, canSelectQuadrant: false)
         try? await Task.sleep(for: .milliseconds(380))
@@ -495,5 +703,96 @@ struct GameView: View {
         }
         busy = false
         refreshInteraction()
+        beginNextTurnClock()
+    }
+
+    private func beginNextTurnClock() {
+        stopTurnTimer()
+        guard showsTurnTimer, game.status == .playing, isHumanTurn else { return }
+        startTurnTimer()
+    }
+
+    private func startTurnTimer() {
+        timerTask?.cancel()
+        turnSecondsLeft = turnTimeLimit
+        guard isHumanTurn else { return }
+        timerTask = Task { @MainActor in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                if busy || showLookPanel { continue }
+                guard isHumanTurn, game.status == .playing else { return }
+                if turnSecondsLeft <= 1 {
+                    turnSecondsLeft = 0
+                    await playTimeoutMove()
+                    return
+                }
+                turnSecondsLeft -= 1
+            }
+        }
+    }
+
+    private func stopTurnTimer() {
+        timerTask?.cancel()
+        timerTask = nil
+    }
+
+    private func playTimeoutMove() async {
+        timerTask = nil
+        guard isHumanTurn, game.status == .playing, !busy else { return }
+        scene.abandonTabletDrag()
+        busy = true
+        scene.setInteraction(canPlace: false, canSelectQuadrant: false)
+
+        if game.phase == .place {
+            let place = GameAI.choosePlacement(model: game.model, level: .easy)
+            let placer = game.currentPlayer
+            _ = game.place(at: place)
+            scene.dropSeal(at: place, player: placer)
+            HapticsService.place(enabled: settings.hapticsEnabled)
+            SoundService.place(enabled: settings.soundEnabled)
+            if game.isFinished {
+                busy = false
+                finishTurnIfNeeded()
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(280))
+        }
+
+        if game.phase == .rotate, game.status == .playing {
+            let rotation = GameAI.chooseRotation(model: game.model, level: .easy)
+            var preview = game.model
+            _ = preview.rotate(quadrant: rotation.0, clockwise: rotation.1)
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                scene.animateRotation(quadrant: rotation.0, clockwise: rotation.1, model: preview) {
+                    _ = game.rotate(quadrant: rotation.0, clockwise: rotation.1)
+                    continuation.resume()
+                }
+            }
+            HapticsService.rotate(enabled: settings.hapticsEnabled)
+            SoundService.rotate(enabled: settings.soundEnabled)
+        }
+
+        busy = false
+        finishTurnIfNeeded()
+        refreshInteraction()
+        if shouldStartAI {
+            stopTurnTimer()
+            Task { await playAI() }
+        } else {
+            beginNextTurnClock()
+        }
+    }
+}
+
+private struct BoardRectKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
     }
 }

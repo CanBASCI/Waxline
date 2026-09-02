@@ -67,6 +67,7 @@ struct SealMark: View {
     var color: Color
     var motif: Color = Theme.gold
     var outline: Color? = nil
+    var outlineWidth: CGFloat? = nil
 
     var body: some View {
         GeometryReader { geo in
@@ -78,7 +79,7 @@ struct SealMark: View {
                     .overlay {
                         if let outline {
                             RoundedRectangle(cornerRadius: side * 0.28, style: .continuous)
-                                .stroke(outline, lineWidth: max(1, side * 0.05))
+                                .stroke(outline, lineWidth: outlineWidth ?? max(1, side * 0.05))
                         }
                     }
                 SealStar()
