@@ -17,7 +17,7 @@ enum MenuIntroMedia {
         return last.isNumeric && last.seconds > 0 ? last : .zero
     }
 
-    static func loopVolume(at time: Double, duration: Double) -> Float {
+    nonisolated static func loopVolume(at time: Double, duration: Double) -> Float {
         let fade = min(2.4, duration / 3)
         guard fade > 0.05 else { return 1 }
         let rising: Double
