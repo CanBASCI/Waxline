@@ -29,8 +29,6 @@ final class BoardSceneController: NSObject {
     private var cameraTilt: Float = 0
     private var panStartTabletYaw: Float = 0
     private var panTabletCenter = SIMD2<Float>.zero
-    private var panGrabCorner = SIMD2<Float>.zero
-    private var panStartBoardXZ = SIMD2<Float>.zero
     private var panTabletDelta: Float = 0
     private var panLastFingerAngle: Float = 0
     private var panUnwrappedDelta: Float = 0
@@ -44,6 +42,7 @@ final class BoardSceneController: NSObject {
     private let tableSize: Float = 7.24
     private let viewFitHalf: Float = 3.6
     private let tabletThick: Float = 0.68
+    private let tableSpinScale: Float = 0.86
     private var sheetPad: Float { 0.08 * playScale }
     private var slab: Float { playScale * tabletThick }
 
@@ -219,25 +218,31 @@ final class BoardSceneController: NSObject {
         boardRoot.position = SCNVector3Zero
         panStartAngle = restYaw
         panTabletDelta = 0
+        panUnwrappedDelta = 0
         let origin = boardRoot.convertPosition(SCNVector3Zero, to: nil)
         let center = SIMD2(origin.x, origin.z)
         panTabletCenter = center
         let point = worldXZ(from: viewPoint, in: view) ?? center
-        panStartBoardXZ = point
-        panGrabCorner = nearestTableCorner(to: point)
+        panLastFingerAngle = fingerAngle(at: point, center: center)
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0.22
+        SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        boardRoot.scale = SCNVector3(tableSpinScale, tableSpinScale, tableSpinScale)
+        SCNTransaction.commit()
     }
 
     private func updateTablePan(at viewPoint: CGPoint, in view: SCNView) {
         guard !isAnimating else { return }
         guard let now = worldXZ(from: viewPoint, in: view) else { return }
+        let vector = now - panTabletCenter
+        guard simd_length(vector) > 0.12 else { return }
         boardRoot.position = SCNVector3Zero
-        let grab = panGrabCorner - panTabletCenter
-        let dragged = panGrabCorner + (now - panStartBoardXZ) - panTabletCenter
-        var delta = signedAngle(from: grab, to: dragged)
+        let angle = fingerAngle(at: now, center: panTabletCenter)
+        panUnwrappedDelta += wrappedDelta(from: panLastFingerAngle, to: angle)
+        panLastFingerAngle = angle
         let limit = Float.pi / 2
-        delta = min(max(delta, -limit), limit)
-        panTabletDelta = delta
-        boardRoot.eulerAngles.y = panStartAngle + delta
+        panTabletDelta = min(max(panUnwrappedDelta, -limit), limit)
+        boardRoot.eulerAngles.y = panStartAngle + panTabletDelta
     }
 
     private func endTablePan() {
@@ -262,7 +267,6 @@ final class BoardSceneController: NSObject {
         let center = SIMD2(lifted.x, lifted.z)
         panTabletCenter = center
         let point = boardXZ(from: viewPoint, in: view) ?? center
-        panStartBoardXZ = point
         panLastFingerAngle = fingerAngle(at: point, center: center)
     }
 
@@ -304,39 +308,6 @@ final class BoardSceneController: NSObject {
         guard let world = boardPoint(from: viewPoint, in: view) else { return nil }
         let local = boardRoot.convertPosition(world, from: nil)
         return SIMD2(local.x, local.z)
-    }
-
-    private func nearestTableCorner(to point: SIMD2<Float>) -> SIMD2<Float> {
-        let half = tableSize / 2
-        let locals = [
-            SCNVector3(half, 0, half),
-            SCNVector3(half, 0, -half),
-            SCNVector3(-half, 0, half),
-            SCNVector3(-half, 0, -half)
-        ]
-        let corners = locals.map { local -> SIMD2<Float> in
-            let world = boardRoot.convertPosition(local, to: nil)
-            return SIMD2(world.x, world.z)
-        }
-        return corners.min(by: { simd_distance($0, point) < simd_distance($1, point) }) ?? corners[0]
-    }
-
-    private func nearestSquareCorner(center: SIMD2<Float>, half: Float, to point: SIMD2<Float>) -> SIMD2<Float> {
-        let corners = [
-            SIMD2(center.x + half, center.y + half),
-            SIMD2(center.x + half, center.y - half),
-            SIMD2(center.x - half, center.y + half),
-            SIMD2(center.x - half, center.y - half)
-        ]
-        return corners.min(by: { simd_distance($0, point) < simd_distance($1, point) }) ?? corners[0]
-    }
-
-    private func signedAngle(from a: SIMD2<Float>, to b: SIMD2<Float>) -> Float {
-        let den = simd_length(a) * simd_length(b)
-        guard den > 0.0001 else { return 0 }
-        let cross = a.y * b.x - a.x * b.y
-        let dot = simd_dot(a, b)
-        return atan2(cross, dot)
     }
 
     private func fingerAngle(at point: SIMD2<Float>, center: SIMD2<Float>) -> Float {
@@ -392,6 +363,7 @@ final class BoardSceneController: NSObject {
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         boardRoot.position = SCNVector3Zero
         boardRoot.eulerAngles.y = yaw
+        boardRoot.scale = SCNVector3(1, 1, 1)
         SCNTransaction.commit()
     }
 

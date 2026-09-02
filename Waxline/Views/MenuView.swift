@@ -65,15 +65,51 @@ struct MenuView: View {
 
 struct SealMark: View {
     var color: Color
+    var motif: Color = Theme.gold
+    var outline: Color? = nil
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(color)
-                .shadow(color: color.opacity(0.35), radius: 10, y: 6)
-            Image(systemName: "seal.fill")
-                .font(.system(size: 36))
-                .foregroundStyle(Theme.gold)
+        GeometryReader { geo in
+            let side = min(geo.size.width, geo.size.height)
+            ZStack {
+                RoundedRectangle(cornerRadius: side * 0.28, style: .continuous)
+                    .fill(color)
+                    .shadow(color: color.opacity(side > 40 ? 0.35 : 0.2), radius: side * 0.12, y: side * 0.08)
+                    .overlay {
+                        if let outline {
+                            RoundedRectangle(cornerRadius: side * 0.28, style: .continuous)
+                                .stroke(outline, lineWidth: max(1, side * 0.05))
+                        }
+                    }
+                SealStar()
+                    .fill(motif)
+                    .frame(width: side * 0.58, height: side * 0.58)
+            }
         }
+        .aspectRatio(1, contentMode: .fit)
+    }
+}
+
+struct SealStar: Shape {
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let outer = min(rect.width, rect.height) / 2
+        let inner = outer * (0.09 / 0.22)
+        var path = Path()
+        for index in 0..<16 {
+            let radius = index.isMultiple(of: 2) ? outer : inner
+            let angle = Double(index) * .pi / 8 - .pi / 2
+            let point = CGPoint(
+                x: center.x + CGFloat(cos(angle)) * radius,
+                y: center.y + CGFloat(sin(angle)) * radius
+            )
+            if index == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+        path.closeSubpath()
+        return path
     }
 }

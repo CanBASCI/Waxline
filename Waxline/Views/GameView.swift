@@ -13,6 +13,7 @@ struct GameView: View {
     @State private var is3DView = false
     @State private var showLookPanel = false
     @State private var resultTask: Task<Void, Never>?
+    private let boardGutter: CGFloat = 30
 
     private func t(_ key: String.LocalizationValue) -> String {
         L10n.text(key, language: settings.language)
@@ -22,7 +23,8 @@ struct GameView: View {
         VStack(spacing: 0) {
             header
             BoardSceneView(controller: scene)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .aspectRatio(0.72, contentMode: .fit)
+                .frame(maxWidth: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -49,8 +51,11 @@ struct GameView: View {
                         .padding(10)
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 4)
+                .padding(.top, boardGutter)
+                .padding(.bottom, boardGutter)
+            turnBanner
             footer
+            Spacer(minLength: 0)
         }
         .background(canvas.ignoresSafeArea())
         .preferredColorScheme(isDark ? .dark : .light)
@@ -84,25 +89,10 @@ struct GameView: View {
                 .font(.system(.body, design: .serif).weight(.medium))
                 .foregroundStyle(ink)
             Spacer()
-            VStack(spacing: 6) {
-                Text(turnTitle)
-                    .font(.system(.headline, design: .serif))
-                    .foregroundStyle(titleColor)
-                if game.status == .playing {
-                    turnSteps
-                }
-            }
-            Spacer()
-            Circle()
-                .fill(currentColor)
-                .overlay {
-                    Circle().stroke(ink.opacity(0.4), lineWidth: settings.sealPalette == .mono ? 1 : 0)
-                }
-                .frame(width: 22, height: 22)
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
-        .padding(.bottom, 8)
+        .padding(.bottom, 0)
         .background {
             Color.clear
                 .contentShape(Rectangle())
@@ -110,6 +100,24 @@ struct GameView: View {
                     if showLookPanel { showLookPanel = false }
                 }
         }
+    }
+
+    private var turnBanner: some View {
+        VStack(spacing: 7) {
+            HStack(spacing: 8) {
+                SealMark(color: currentColor, motif: sealMotif, outline: sealOutline)
+                    .frame(width: 22, height: 22)
+                Text(turnTitle)
+                    .font(.system(.headline, design: .serif))
+                    .foregroundStyle(titleColor)
+            }
+            if game.status == .playing {
+                turnSteps
+            }
+        }
+        .padding(.top, 0)
+        .padding(.bottom, 0)
+        .frame(maxWidth: .infinity)
     }
 
     private var footer: some View {
@@ -134,8 +142,9 @@ struct GameView: View {
                     .foregroundStyle(ink.opacity(0.7))
             }
         }
-        .frame(minHeight: 92)
-        .padding(.bottom, 18)
+        .frame(minHeight: 48)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
         .contentShape(Rectangle())
         .onTapGesture {
             if showLookPanel { showLookPanel = false }
@@ -241,8 +250,9 @@ struct GameView: View {
     }
 
     private var titleColor: Color {
-        if !isDark, settings.sealPalette == .mono, game.currentPlayer == .indigo {
-            return ink
+        if settings.sealPalette == .mono {
+            if isDark, game.currentPlayer == .red { return ink }
+            if !isDark, game.currentPlayer == .indigo { return ink }
         }
         return currentColor
     }
@@ -252,6 +262,24 @@ struct GameView: View {
             return Theme.ink
         }
         return Theme.cream
+    }
+
+    private var sealMotif: Color {
+        if settings.sealPalette == .mono, game.currentPlayer == .indigo {
+            return Theme.waxBlack
+        }
+        return Theme.gold
+    }
+
+    private var sealOutline: Color? {
+        guard settings.sealPalette == .mono else { return nil }
+        if isDark, game.currentPlayer == .red {
+            return ink.opacity(0.7)
+        }
+        if !isDark, game.currentPlayer == .indigo {
+            return ink.opacity(0.4)
+        }
+        return nil
     }
 
     private var tableTitleKey: String.LocalizationValue {

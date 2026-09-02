@@ -13,7 +13,11 @@ struct ResultSheet: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            SealMark(color: badgeColor)
+            SealMark(
+                color: badgeColor,
+                motif: badgeMotif,
+                outline: badgeOutline
+            )
                 .frame(width: 72, height: 72)
                 .padding(.top, 12)
             Text(title)
@@ -67,6 +71,28 @@ struct ResultSheet: View {
         default:
             Theme.gold
         }
+    }
+
+    private var isWhiteWin: Bool {
+        if case .won(let player, _) = game.status {
+            return settings.sealPalette == .mono && player == .indigo
+        }
+        return false
+    }
+
+    private var badgeMotif: Color {
+        isWhiteWin ? Theme.waxBlack : Theme.gold
+    }
+
+    private var badgeOutline: Color? {
+        guard settings.sealPalette == .mono else { return nil }
+        if isDark, case .won(let player, _) = game.status, player == .red {
+            return Theme.ink(dark: true).opacity(0.7)
+        }
+        if isWhiteWin {
+            return Theme.ink.opacity(0.4)
+        }
+        return nil
     }
 }
 
