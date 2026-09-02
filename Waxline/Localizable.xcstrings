@@ -618,13 +618,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Place a seal on a tablet"
+            "value" : "Tap an empty cell"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mühürü tablete yerleştir"
+            "value" : "Boş bir hücreye dokun"
           }
         }
       }

@@ -37,6 +37,12 @@ struct GameView: View {
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay {
+                    CornerBrackets(cornerRadius: 12, length: 18)
+                        .stroke(ink.opacity(0.55), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        .padding(1)
+                        .allowsHitTesting(false)
+                }
+                .overlay {
                     if showLookPanel {
                         Color.clear
                             .contentShape(Rectangle())
@@ -786,6 +792,50 @@ struct GameView: View {
         } else {
             beginNextTurnClock()
         }
+    }
+}
+
+private struct CornerBrackets: Shape {
+    var cornerRadius: CGFloat
+    var length: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let radius = min(cornerRadius, length)
+        var path = Path()
+
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + length))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + radius))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + radius, y: rect.minY),
+            control: CGPoint(x: rect.minX, y: rect.minY)
+        )
+        path.addLine(to: CGPoint(x: rect.minX + length, y: rect.minY))
+
+        path.move(to: CGPoint(x: rect.maxX - length, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.minY + radius),
+            control: CGPoint(x: rect.maxX, y: rect.minY)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + length))
+
+        path.move(to: CGPoint(x: rect.maxX, y: rect.maxY - length))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX - radius, y: rect.maxY),
+            control: CGPoint(x: rect.maxX, y: rect.maxY)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - length, y: rect.maxY))
+
+        path.move(to: CGPoint(x: rect.minX + length, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX, y: rect.maxY - radius),
+            control: CGPoint(x: rect.minX, y: rect.maxY)
+        )
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - length))
+
+        return path
     }
 }
 
