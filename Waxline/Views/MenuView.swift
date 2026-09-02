@@ -4,6 +4,7 @@ struct MenuView: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(GameCenterService.self) private var gameCenter
 
+    var playback: MenuIntroPlayback
     var onLocal: () -> Void
     var onAI: () -> Void
     var onGameCenter: () -> Void
@@ -14,52 +15,122 @@ struct MenuView: View {
         L10n.text(key, language: settings.language)
     }
 
+    private var menuFont: Font { .system(.body, design: .serif).weight(.medium) }
+    @State private var idle = false
+
     var body: some View {
-        VStack(spacing: 22) {
-            Spacer()
-            SealMark(color: Theme.waxRed)
-                .frame(width: 92, height: 92)
-            VStack(spacing: 6) {
-                Text(t("app_name"))
-                    .font(.system(.largeTitle, design: .serif).weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                Text(t("app_subtitle"))
-                    .font(.system(.title3, design: .serif))
-                    .foregroundStyle(Theme.ink.opacity(0.7))
-            }
-            .padding(.bottom, 12)
+        ZStack(alignment: .bottomTrailing) {
+            MenuSakuraBackdrop(playback: playback)
 
-            menuButton(t("menu_local"), color: Theme.waxRed, action: onLocal)
-            menuButton(t("menu_ai"), color: Theme.waxIndigo, action: onAI)
-            menuButton(t("menu_gamecenter"), color: Theme.gold, action: onGameCenter)
-            if !gameCenter.isAuthenticated {
-                Text(t("gc_sign_in"))
-                    .font(.footnote)
-                    .foregroundStyle(Theme.ink.opacity(0.55))
-            }
+            VStack(alignment: .trailing, spacing: 18) {
+                VStack(alignment: .trailing, spacing: 8) {
+                    SealMark(color: Theme.waxRed)
+                        .frame(width: 68, height: 68)
+                    Text(t("app_name"))
+                        .font(.system(.title, design: .serif).weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                        .offset(y: playback.didFinish ? 0 : (1 - playback.progress) * 108)
+                }
+                .shadow(color: Color.white.opacity(0.75), radius: 8)
 
-            Spacer()
-            HStack(spacing: 28) {
-                Button(t("menu_how_to_play"), action: onHowToPlay)
-                Button(t("menu_settings"), action: onSettings)
+                VStack(alignment: .trailing, spacing: 14) {
+                    textLink(t("menu_local"), index: 0, action: onLocal)
+                    textLink(t("menu_ai"), index: 1, action: onAI)
+                    textLink(t("menu_gamecenter"), index: 2, action: onGameCenter)
+                    textLink(t("menu_how_to_play"), index: 3, action: onHowToPlay)
+                    textLink(t("menu_settings"), index: 4, action: onSettings)
+                }
+                .font(menuFont)
+                .foregroundStyle(Theme.ink)
+                .shadow(color: Color.white.opacity(0.75), radius: 8)
+                .allowsHitTesting(playback.didFinish)
+                .overlay(alignment: .bottomTrailing) {
+                    if !gameCenter.isAuthenticated {
+                        Text(t("gc_sign_in"))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.ink.opacity(0.55))
+                            .offset(y: 18)
+                            .opacity(playback.didFinish ? 1 : 0)
+                            .allowsHitTesting(false)
+                    }
+                }
             }
-            .font(.system(.body, design: .serif).weight(.medium))
-            .foregroundStyle(Theme.ink)
-            .padding(.bottom, 28)
+            .padding(.trailing, 22)
+            .padding(.bottom, 36)
+            .safeAreaPadding(.bottom)
+            .safeAreaPadding(.trailing)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }
-        .padding(.horizontal, 28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
+        .safeAreaInset(edge: .top, alignment: .trailing, spacing: 0) {
+            if playback.isReady, !playback.didFinish {
+                Button(action: playback.skip) {
+                    Text(t("onboarding_skip"))
+                        .font(menuFont)
+                        .blendMode(.destinationOut)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background { SkipCutoutBackdrop() }
+                        .compositingGroup()
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 22)
+                .padding(.top, 8)
+            }
+        }
+        .onAppear {
+            if playback.didFinish { idle = true }
+        }
+        .onChange(of: playback.didFinish) { _, finished in
+            guard finished else { return }
+            Task {
+                try? await Task.sleep(for: .milliseconds(800))
+                idle = true
+            }
+        }
     }
 
-    private func menuButton(_ title: String, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(.title3, design: .serif).weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .foregroundStyle(Theme.cream)
-                .background(color, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    private func textLink(_ title: String, index: Int, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .buttonStyle(.plain)
+            .menuLineMotion(revealed: playback.didFinish, idle: idle, index: index)
+    }
+}
+
+private struct SkipCutoutBackdrop: View {
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            Color.clear.glassEffect(.regular, in: Capsule())
+        } else {
+            Color.clear.background(.ultraThinMaterial, in: Capsule())
         }
-        .buttonStyle(.plain)
+    }
+}
+
+private struct MenuLineMotion: ViewModifier {
+    var revealed: Bool
+    var idle: Bool
+    var index: Int
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: revealed ? 0 : 96)
+            .opacity(revealed ? 1 : 0)
+            .animation(.easeOut(duration: 0.65).delay(Double(index) * 0.09), value: revealed)
+            .offset(y: idle ? -2.5 : 2.5)
+            .animation(
+                idle
+                    ? .easeInOut(duration: 3.8).repeatForever(autoreverses: true).delay(Double(index) * 0.2)
+                    : .default,
+                value: idle
+            )
+    }
+}
+
+private extension View {
+    func menuLineMotion(revealed: Bool, idle: Bool, index: Int) -> some View {
+        modifier(MenuLineMotion(revealed: revealed, idle: idle, index: index))
     }
 }
 
@@ -84,7 +155,7 @@ struct SealMark: View {
                     }
                 SealStar()
                     .fill(motif)
-                    .frame(width: side * 0.58, height: side * 0.58)
+                    .frame(width: side * 0.71, height: side * 0.71)
             }
         }
         .aspectRatio(1, contentMode: .fit)

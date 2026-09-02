@@ -7,7 +7,7 @@ enum Theme {
     static let ink = Color(red: 0.24, green: 0.16, blue: 0.12)
     static let waxRed = Color(red: 0.69, green: 0.13, blue: 0.18)
     static let waxIndigo = Color(red: 0.18, green: 0.16, blue: 0.42)
-    static let gold = Color(red: 0.72, green: 0.55, blue: 0.28)
+    static let gold = Color(red: 0.95, green: 0.82, blue: 0.45)
     static let waxBlack = Color(red: 0.10, green: 0.09, blue: 0.08)
     static let waxWhite = Color(red: 0.95, green: 0.95, blue: 0.96)
 
@@ -39,15 +39,21 @@ struct RootView: View {
     @State private var game: GameState?
     @State private var showSettings = false
     @State private var showOnboarding = false
+    @State private var menuIntro = MenuIntroPlayback()
 
     var body: some View {
         @Bindable var gameCenter = gameCenter
+        let menuForeground = game == nil
+            && !showOnboarding
+            && !showSettings
+            && !gameCenter.matchmakerPresented
         ZStack {
-            Theme.cream.ignoresSafeArea()
             if let game {
+                Theme.cream.ignoresSafeArea()
                 GameView(game: game, onExit: { self.game = nil })
             } else {
                 MenuView(
+                    playback: menuIntro,
                     onLocal: { start(.local) },
                     onAI: { start(.ai(settings.aiLevel)) },
                     onGameCenter: { gameCenter.presentMatchmaker() },
@@ -56,8 +62,19 @@ struct RootView: View {
                 )
             }
         }
+        .onAppear {
+            menuIntro.setSoundEnabled(settings.soundEnabled)
+            menuIntro.setMenuVisible(menuForeground)
+        }
+        .onChange(of: menuForeground) { _, visible in
+            menuIntro.setMenuVisible(visible)
+        }
+        .onChange(of: settings.soundEnabled) { _, enabled in
+            menuIntro.setSoundEnabled(enabled)
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
+                .presentationDetents([.medium])
         }
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView {
@@ -98,6 +115,7 @@ struct RootView: View {
     }
 
     private func start(_ mode: GameMode) {
+        menuIntro.setMenuVisible(false)
         game = GameState(mode: mode)
     }
 
@@ -107,6 +125,7 @@ struct RootView: View {
     }
 
     private func openGameCenter(_ match: GKTurnBasedMatch) {
+        menuIntro.setMenuVisible(false)
         gameCenter.attach(match: match)
         game = GameState(mode: .gameCenter, model: gameCenter.model(from: match))
     }
