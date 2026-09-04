@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ResultSheet: View {
     var game: GameState
+    var skin: GameSkin = .classic
     var onAgain: () -> Void
     var onMenu: () -> Void
     @Environment(SettingsStore.self) private var settings
@@ -67,7 +68,7 @@ struct ResultSheet: View {
     private var badgeColor: Color {
         switch game.status {
         case .won(let player, _):
-            Theme.seal(player, palette: settings.sealPalette)
+            Theme.seal(player, palette: settings.sealPalette, skin: skin)
         default:
             Theme.gold
         }

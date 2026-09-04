@@ -7,6 +7,8 @@ enum Theme {
     static let ink = Color(red: 0.24, green: 0.16, blue: 0.12)
     static let waxRed = Color(red: 0.69, green: 0.13, blue: 0.18)
     static let waxIndigo = Color(red: 0.18, green: 0.16, blue: 0.42)
+    static let waxCinnabar = Color(red: 0.76, green: 0.16, blue: 0.18)
+    static let waxPlum = Color(red: 0.15, green: 0.14, blue: 0.15)
     static let gold = Color(red: 0.95, green: 0.82, blue: 0.45)
     static let waxBlack = Color(red: 0.10, green: 0.09, blue: 0.08)
     static let waxWhite = Color(red: 0.95, green: 0.95, blue: 0.96)
@@ -23,12 +25,21 @@ enum Theme {
         dark ? Color(red: 0.18, green: 0.15, blue: 0.12) : cream.opacity(0.94)
     }
 
-    static func seal(_ player: Player, palette: SealPalette) -> Color {
-        switch (palette, player) {
-        case (.classic, .red): waxRed
-        case (.classic, .indigo): waxIndigo
-        case (.mono, .red): waxBlack
-        case (.mono, .indigo): waxWhite
+    static func seal(_ player: Player, palette: SealPalette, skin: GameSkin = .classic) -> Color {
+        if skin == .sakura {
+            switch (palette, player) {
+            case (.classic, .red): waxCinnabar
+            case (.classic, .indigo): waxPlum
+            case (.mono, .red): waxBlack
+            case (.mono, .indigo): waxWhite
+            }
+        } else {
+            switch (palette, player) {
+            case (.classic, .red): waxRed
+            case (.classic, .indigo): waxIndigo
+            case (.mono, .red): waxBlack
+            case (.mono, .indigo): waxWhite
+            }
         }
     }
 }
@@ -40,6 +51,7 @@ struct RootView: View {
     @State private var showSettings = false
     @State private var showOnboarding = false
     @State private var menuIntro = MenuIntroPlayback()
+    @State private var gameSkin: GameSkin = .classic
 
     var body: some View {
         @Bindable var gameCenter = gameCenter
@@ -49,8 +61,13 @@ struct RootView: View {
             && !gameCenter.matchmakerPresented
         ZStack {
             if let game {
-                Theme.cream.ignoresSafeArea()
-                GameView(game: game, onExit: { self.game = nil })
+                if gameSkin == .classic {
+                    Theme.cream.ignoresSafeArea()
+                }
+                GameView(game: game, skin: gameSkin, onExit: {
+                    self.game = nil
+                    gameSkin = .classic
+                })
             } else {
                 MenuView(
                     playback: menuIntro,
@@ -58,7 +75,8 @@ struct RootView: View {
                     onAI: { start(.ai(settings.aiLevel)) },
                     onGameCenter: { gameCenter.presentMatchmaker() },
                     onSettings: { showSettings = true },
-                    onHowToPlay: { showOnboarding = true }
+                    onHowToPlay: { showOnboarding = true },
+                    onTest: { start(.local, skin: .sakura) }
                 )
             }
         }
@@ -114,8 +132,9 @@ struct RootView: View {
         }
     }
 
-    private func start(_ mode: GameMode) {
+    private func start(_ mode: GameMode, skin: GameSkin = .classic) {
         menuIntro.setMenuVisible(false)
+        gameSkin = skin
         game = GameState(mode: mode)
     }
 

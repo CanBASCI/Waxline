@@ -55,6 +55,11 @@ enum GameMode: Equatable, Hashable {
     case gameCenter
 }
 
+enum GameSkin: Equatable {
+    case classic
+    case sakura
+}
+
 enum AILevel: String, Sendable, Codable, CaseIterable, Identifiable {
     case easy
     case medium
@@ -94,6 +99,62 @@ enum TabletFinish: String, Sendable, Codable, CaseIterable {
     case granite
     case slate
     case sand
+}
+
+enum SakuraTableTheme: String, Sendable, CaseIterable {
+    case oak
+    case honey
+    case plank
+    case cedar
+
+    var colorResource: String {
+        switch self {
+        case .oak: "sakura_table_color"
+        case .honey: "sakura_table_honey_color"
+        case .plank: "sakura_table_plank_color"
+        case .cedar: "sakura_table_cedar_color"
+        }
+    }
+
+    var roughResource: String {
+        switch self {
+        case .oak: "sakura_table_rough"
+        case .honey: "sakura_table_honey_rough"
+        case .plank: "sakura_table_plank_rough"
+        case .cedar: "sakura_table_cedar_rough"
+        }
+    }
+}
+
+enum SakuraTabletTheme: String, Sendable, CaseIterable {
+    case grey
+    case white
+    case taupe
+    case charcoal
+    case paper
+    case glass
+
+    var colorResource: String? {
+        switch self {
+        case .grey: "sakura_tablet_color"
+        case .white: "sakura_tablet_white_color"
+        case .taupe: "sakura_tablet_taupe_color"
+        case .charcoal: "sakura_tablet_charcoal_color"
+        case .paper: "sakura_tablet_paper_color"
+        case .glass: nil
+        }
+    }
+
+    var roughResource: String? {
+        switch self {
+        case .grey: "sakura_tablet_rough"
+        case .white: "sakura_tablet_white_rough"
+        case .taupe: "sakura_tablet_taupe_rough"
+        case .charcoal: "sakura_tablet_charcoal_rough"
+        case .paper: "sakura_tablet_paper_rough"
+        case .glass: nil
+        }
+    }
 }
 
 struct LastMove: Sendable, Equatable, Identifiable {

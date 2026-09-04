@@ -18,6 +18,8 @@ struct BoardSceneView: UIViewRepresentable {
         view.allowsCameraControl = false
         view.isPlaying = true
         view.clipsToBounds = true
+        view.hitchProbe.attach(to: view)
+        WaxlinePerf.event("scnview.setup", "msaa=4x fps=60")
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tapped(_:)))
         let pan = UIPanGestureRecognizer(target: controller, action: #selector(BoardSceneController.handleBoardPan(_:)))
         pan.maximumNumberOfTouches = 1
@@ -61,6 +63,7 @@ final class BoardSCNView: SCNView {
     var onLayout: ((CGSize) -> Void)?
     var onTouchBegan: ((CGPoint) -> Void)?
     var onTouchEnded: (() -> Void)?
+    let hitchProbe = HitchProbe()
 
     override func layoutSubviews() {
         super.layoutSubviews()
@@ -82,5 +85,25 @@ final class BoardSCNView: SCNView {
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesCancelled(touches, with: event)
         onTouchEnded?()
+    }
+}
+
+final class HitchProbe: NSObject, SCNSceneRendererDelegate, @unchecked Sendable {
+    nonisolated(unsafe) private var lastRenderTime: TimeInterval = 0
+    nonisolated(unsafe) private var hitchCount = 0
+
+    func attach(to view: SCNView) {
+        view.delegate = self
+    }
+
+    nonisolated func renderer(_ renderer: SCNSceneRenderer, didRenderScene scene: SCNScene, atTime time: TimeInterval) {
+        if lastRenderTime > 0 {
+            let ms = (time - lastRenderTime) * 1000
+            if ms > 22 {
+                hitchCount += 1
+                WaxlinePerf.event("hitch.frame", String(format: "%.1fms count=%d", ms, hitchCount))
+            }
+        }
+        lastRenderTime = time
     }
 }

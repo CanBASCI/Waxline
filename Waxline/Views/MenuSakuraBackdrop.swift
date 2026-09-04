@@ -6,6 +6,12 @@ enum MenuIntroMediaError: Error {
 }
 
 enum MenuIntroMedia {
+    /// Last seconds of the intro: loop plays underneath and opacity crossfades.
+    /// Long enough to read as continuity, short enough to avoid a double-image.
+    static let visualHandoffDuration: Double = 2.0
+    /// Decode the loop a moment before the fade so the first visible frame is ready.
+    static let visualHandoffPreroll: Double = 0.25
+
     static func lastVisibleTime(
         duration: CMTime,
         frameDuration: CMTime = CMTime(value: 1, timescale: 24)
@@ -55,9 +61,12 @@ enum MenuIntroMedia {
 @Observable
 final class MenuIntroPlayback {
     let player = AVPlayer()
+    let loopPlayer = AVQueuePlayer()
     private(set) var isReady = false
     private(set) var didFinish = false
     private(set) var progress = 0.0
+    /// 0 = intro only, 1 = loop only. Driven by remaining intro time, not a scale animation.
+    private(set) var handoff = 0.0
 
     @ObservationIgnored private var endObserver: NSObjectProtocol?
     @ObservationIgnored private var statusObservation: NSKeyValueObservation?
@@ -65,8 +74,11 @@ final class MenuIntroPlayback {
     @ObservationIgnored private var musicLooper: AVPlayerLooper?
     @ObservationIgnored private var videoFadeObserver: Any?
     @ObservationIgnored private var musicFadeObserver: Any?
+    @ObservationIgnored private var loopLooper: AVPlayerLooper?
     @ObservationIgnored private var menuVisible = false
     @ObservationIgnored private var soundEnabled = true
+    @ObservationIgnored private var loopHandoffStarted = false
+    @ObservationIgnored private var handoffTask: Task<Void, Never>?
 
     init() {
         player.actionAtItemEnd = .pause
@@ -87,6 +99,7 @@ final class MenuIntroPlayback {
         } else {
             player.pause()
             musicPlayer?.pause()
+            loopPlayer.pause()
         }
     }
 
@@ -94,6 +107,9 @@ final class MenuIntroPlayback {
         guard let url = Bundle.main.url(forResource: "mainpagesakuravideo", withExtension: "mp4") else {
             didFinish = true
             progress = 1
+            handoff = 1
+            loopHandoffStarted = true
+            prepareVisualLoop()
             return
         }
         let asset = AVURLAsset(url: url)
@@ -106,11 +122,7 @@ final class MenuIntroPlayback {
         statusObservation = item.observe(\.status, options: [.new]) { [weak self] item, _ in
             guard item.status == .readyToPlay else { return }
             Task { @MainActor in
-                self?.isReady = true
-                let seconds = item.duration.seconds
-                if seconds.isFinite, seconds > 0, self?.didFinish == false {
-                    self?.progress = min(1, max(0, (self?.player.currentTime().seconds ?? 0) / seconds))
-                }
+                self?.markReadyAfterFirstFrame()
             }
         }
 
@@ -125,6 +137,39 @@ final class MenuIntroPlayback {
         }
 
         Task { await prepareAudioLoop(from: asset) }
+        prepareVisualLoop()
+    }
+
+    private func markReadyAfterFirstFrame() {
+        guard !isReady else { return }
+        player.preroll(atRate: 1) { [weak self] _ in
+            Task { @MainActor in
+                self?.finishReady()
+            }
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(450))
+            self.finishReady()
+        }
+    }
+
+    private func finishReady() {
+        guard !isReady else { return }
+        isReady = true
+        let seconds = player.currentItem?.duration.seconds ?? 0
+        if seconds.isFinite, seconds > 0, !didFinish {
+            progress = min(1, max(0, player.currentTime().seconds / seconds))
+        }
+        if menuVisible {
+            resumeIfNeeded()
+        }
+    }
+
+    private func prepareVisualLoop() {
+        loopPlayer.isMuted = true
+        loopPlayer.volume = 0
+        guard let url = Bundle.main.url(forResource: "gamescreensakuravideo", withExtension: "mov") else { return }
+        loopLooper = AVPlayerLooper(player: loopPlayer, templateItem: AVPlayerItem(url: url))
     }
 
     private func prepareAudioLoop(from asset: AVAsset) async {
@@ -172,10 +217,26 @@ final class MenuIntroPlayback {
             player.rate = 0
             player.isMuted = true
             startMusicIfNeeded()
+            startVisualLoopIfNeeded()
         } else {
             player.isMuted = !soundEnabled
             player.play()
+            if loopHandoffStarted {
+                startVisualLoopIfNeeded()
+            } else {
+                loopPlayer.pause()
+            }
         }
+    }
+
+    private func startVisualLoopIfNeeded() {
+        guard menuVisible, didFinish || loopHandoffStarted else {
+            loopPlayer.pause()
+            return
+        }
+        loopPlayer.isMuted = true
+        loopPlayer.volume = 0
+        loopPlayer.play()
     }
 
     private func startMusicIfNeeded() {
@@ -203,6 +264,7 @@ final class MenuIntroPlayback {
                 player.volume = self.soundEnabled ? fade : 0
                 if player === self.player, !self.didFinish {
                     self.progress = min(1, max(0, current / duration))
+                    self.updateVisualHandoff(current: current, duration: duration)
                 }
             }
         }
@@ -211,6 +273,48 @@ final class MenuIntroPlayback {
     func skip() {
         guard !didFinish else { return }
         freezeAtEnd(seekToLastFrame: true)
+    }
+
+    private func updateVisualHandoff(current: Double, duration: Double) {
+        let remaining = duration - current
+        let window = MenuIntroMedia.visualHandoffDuration
+        let preroll = MenuIntroMedia.visualHandoffPreroll
+        if remaining <= window + preroll {
+            beginLoopHandoff()
+        }
+        guard remaining <= window else { return }
+        let raw = min(1, max(0, 1 - remaining / window))
+        handoff = raw * raw * (3 - 2 * raw)
+    }
+
+    private func beginLoopHandoff() {
+        guard !loopHandoffStarted else { return }
+        loopHandoffStarted = true
+        startVisualLoopIfNeeded()
+    }
+
+    private func setHandoff(_ value: Double, animated: Bool) {
+        handoffTask?.cancel()
+        let target = min(1, max(0, value))
+        guard animated, abs(target - handoff) > 0.02 else {
+            handoff = target
+            return
+        }
+        let from = handoff
+        handoffTask = Task { @MainActor in
+            let duration = 0.55
+            let start = Date()
+            while !Task.isCancelled {
+                let u = Date().timeIntervalSince(start) / duration
+                if u >= 1 {
+                    handoff = target
+                    break
+                }
+                let t = u * u * (3 - 2 * u)
+                handoff = from + (target - from) * t
+                try? await Task.sleep(for: .milliseconds(16))
+            }
+        }
     }
 
     private func freezeAtEnd(seekToLastFrame: Bool) {
@@ -233,8 +337,11 @@ final class MenuIntroPlayback {
                 }
             }
         }
+        beginLoopHandoff()
+        setHandoff(1, animated: seekToLastFrame && handoff < 0.95)
         activateSession()
         startMusicIfNeeded()
+        startVisualLoopIfNeeded()
     }
 }
 
@@ -242,12 +349,17 @@ struct MenuSakuraBackdrop: View {
     var playback: MenuIntroPlayback
 
     var body: some View {
-        PlayerLayerView(player: playback.player)
-            .opacity(playback.isReady ? 1 : 0)
-            .background(Theme.cream)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
+        ZStack {
+            Theme.cream
+            PlayerLayerView(player: playback.player)
+                .opacity(playback.isReady ? 1 - playback.handoff : 0)
+            PlayerLayerView(player: playback.loopPlayer)
+                .opacity(playback.handoff)
+        }
+        .clipped()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 }
 

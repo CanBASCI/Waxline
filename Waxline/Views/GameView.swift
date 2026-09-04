@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GameView: View {
     @Bindable var game: GameState
+    var skin: GameSkin = .classic
     var onExit: () -> Void
 
     @Environment(SettingsStore.self) private var settings
@@ -12,6 +13,10 @@ struct GameView: View {
     @State private var showResult = false
     @State private var is3DView = false
     @State private var showLookPanel = false
+    @State private var sakuraDark = false
+    @State private var sakuraTable: SakuraTableTheme = .oak
+    @State private var sakuraTablet: SakuraTabletTheme = .glass
+    @State private var sakuraShowsTable = false
     @State private var resultTask: Task<Void, Never>?
     @State private var timerTask: Task<Void, Never>?
     @State private var turnSecondsLeft = 15
@@ -61,7 +66,6 @@ struct GameView: View {
                         Color.clear.preference(key: BoardRectKey.self, value: geo.frame(in: .named("gameCanvas")))
                     }
                 }
-                .padding(.horizontal, 14)
                 .padding(.top, 0)
                 .padding(.bottom, boardGutter)
             footer
@@ -71,7 +75,13 @@ struct GameView: View {
         .onPreferenceChange(BoardRectKey.self) { boardRect = $0 }
         .contentShape(Rectangle())
         .simultaneousGesture(tableSpinGesture)
-        .background(canvas.ignoresSafeArea())
+        .background {
+            if skin == .sakura {
+                GameLoopBackdrop(resource: "gamescreensakuravideo_2", ext: "mov")
+            } else {
+                canvas.ignoresSafeArea()
+            }
+        }
         .preferredColorScheme(isDark ? .dark : .light)
         .onAppear { configureScene() }
         .onChange(of: game.status) { _, newStatus in
@@ -93,7 +103,7 @@ struct GameView: View {
             reloadRemoteMatch()
         }
         .sheet(isPresented: $showResult) {
-            ResultSheet(game: game, onAgain: replay, onMenu: onExit)
+            ResultSheet(game: game, skin: usesSakuraSurfaces ? .sakura : .classic, onAgain: replay, onMenu: onExit)
                 .presentationDetents([.height(240)])
         }
         .onDisappear {
@@ -114,6 +124,7 @@ struct GameView: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 0)
+        .shadow(color: textHalo, radius: skin == .sakura ? 8 : 0)
         .background {
             Color.clear
                 .contentShape(Rectangle())
@@ -159,6 +170,7 @@ struct GameView: View {
         .padding(.top, boardGutter)
         .padding(.bottom, boardGutter)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .shadow(color: textHalo, radius: skin == .sakura ? 8 : 0)
     }
 
     private var footer: some View {
@@ -178,6 +190,7 @@ struct GameView: View {
         .padding(.horizontal, 20)
         .padding(.top, 18)
         .padding(.bottom, 12)
+        .shadow(color: textHalo, radius: skin == .sakura ? 8 : 0)
         .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(t("last_move"))
@@ -210,7 +223,7 @@ struct GameView: View {
         return ZStack(alignment: .bottom) {
             ForEach(0..<count, id: \.self) { index in
                 SealMark(
-                    color: Theme.seal(player, palette: settings.sealPalette),
+                    color: Theme.seal(player, palette: settings.sealPalette, skin: usesSakuraSurfaces ? .sakura : .classic),
                     motif: reserveMotif(player),
                     outline: stackEdge(for: player),
                     outlineWidth: 1.2
@@ -243,7 +256,7 @@ struct GameView: View {
 
     private func stackEdge(for player: Player) -> Color {
         let isWhite = settings.sealPalette == .mono && player == .indigo
-        return isWhite ? Theme.waxBlack : Theme.cream
+        return isWhite ? Theme.waxBlack : (skin == .sakura ? Color.white : Theme.cream)
     }
 
     private var boardStatus: some View {
@@ -252,6 +265,7 @@ struct GameView: View {
                 Text(message)
                     .font(.system(.subheadline, design: .serif))
                     .foregroundStyle(ink.opacity(0.7))
+                    .shadow(color: textHalo, radius: skin == .sakura ? 6 : 0)
                     .padding(.bottom, 16)
             }
         }
@@ -328,22 +342,45 @@ struct GameView: View {
             ZStack(alignment: .trailing) {
                 if showLookPanel {
                     HStack(spacing: 6) {
-                        lookChip(isDark ? t("look_dark") : t("look_light")) {
-                            settings.boardDark.toggle()
-                            applyBoardLook()
+                        if skin == .sakura {
+                            lookChip(sakuraDark ? t("look_dark") : t("look_light")) {
+                                sakuraDark.toggle()
+                                applyBoardLook()
+                                scene.syncBoard(game.model, winningLine: nil)
+                            }
+                            lookChip(t(sakuraTableTitleKey)) {
+                                sakuraTable.cycle()
+                                applyBoardSurfaces()
+                            }
+                            lookChip(t(sakuraTabletTitleKey)) {
+                                sakuraTablet.cycle()
+                                applyBoardSurfaces()
+                            }
+                            lookChip(sakuraShowsTable ? t("sakura_table_hide") : t("sakura_table_show")) {
+                                sakuraShowsTable.toggle()
+                                WaxlinePerf.event(sakuraShowsTable ? "table.show" : "table.hide")
+                                scene.setTableVisible(sakuraShowsTable)
+                            }
+                        } else {
+                            lookChip(isDark ? t("look_dark") : t("look_light")) {
+                                settings.boardDark.toggle()
+                                applyBoardLook()
+                            }
                         }
                         lookChip(settings.sealPalette == .mono ? t("seal_mono") : t("seal_classic")) {
                             settings.sealPalette.cycle()
                             applyBoardLook()
                             scene.syncBoard(game.model, winningLine: nil)
                         }
-                        lookChip(t(tabletTitleKey)) {
-                            settings.tabletFinish.cycle()
-                            applyBoardLook()
-                        }
-                        lookChip(t(tableTitleKey)) {
-                            settings.tableFinish.cycle()
-                            applyBoardLook()
+                        if skin != .sakura {
+                            lookChip(t(tabletTitleKey)) {
+                                settings.tabletFinish.cycle()
+                                applyBoardSurfaces()
+                            }
+                            lookChip(t(tableTitleKey)) {
+                                settings.tableFinish.cycle()
+                                applyBoardSurfaces()
+                            }
                         }
                     }
                     .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -361,7 +398,7 @@ struct GameView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(ink)
                     .frame(width: 32, height: 32)
-                    .background(Theme.chipFill(dark: isDark), in: Circle())
+                    .background(chromeFill, in: Circle())
                     .overlay {
                         Circle().stroke(ink.opacity(0.35), lineWidth: 1)
                     }
@@ -382,7 +419,7 @@ struct GameView: View {
                 .foregroundStyle(ink)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Theme.chipFill(dark: isDark), in: Capsule())
+                .background(chromeFill, in: Capsule())
                 .overlay {
                     Capsule().stroke(ink.opacity(0.35), lineWidth: 1)
                 }
@@ -390,16 +427,32 @@ struct GameView: View {
         .buttonStyle(.plain)
     }
 
-    private var isDark: Bool { settings.boardDark }
+    private var isDark: Bool { skin == .sakura ? sakuraDark : settings.boardDark }
+    private var usesSakuraSurfaces: Bool { skin == .sakura }
     private var canvas: Color { Theme.canvas(dark: isDark) }
-    private var ink: Color { Theme.ink(dark: isDark) }
+    private var ink: Color {
+        if skin == .sakura {
+            return isDark ? Color(white: 0.96) : Color(white: 0.08)
+        }
+        return Theme.ink(dark: isDark)
+    }
+    private var textHalo: Color {
+        guard skin == .sakura else { return .clear }
+        return isDark ? Color.black.opacity(0.55) : Color.white.opacity(0.8)
+    }
+    private var chromeFill: Color {
+        if skin == .sakura {
+            return isDark ? Color.white.opacity(0.14) : Color.white.opacity(0.55)
+        }
+        return Theme.chipFill(dark: isDark)
+    }
     private var bannerFont: Font { .system(.body, design: .serif).weight(.medium) }
     private var turnTimerColor: Color {
         turnSecondsLeft <= 5 ? Theme.waxRed : ink
     }
 
     private var currentColor: Color {
-        Theme.seal(game.currentPlayer, palette: settings.sealPalette)
+        Theme.seal(game.currentPlayer, palette: settings.sealPalette, skin: usesSakuraSurfaces ? .sakura : .classic)
     }
 
     private var titleColor: Color {
@@ -433,6 +486,26 @@ struct GameView: View {
             return ink.opacity(0.4)
         }
         return nil
+    }
+
+    private var sakuraTableTitleKey: String.LocalizationValue {
+        switch sakuraTable {
+        case .oak: "sakura_table_oak"
+        case .honey: "sakura_table_honey"
+        case .plank: "sakura_table_plank"
+        case .cedar: "sakura_table_cedar"
+        }
+    }
+
+    private var sakuraTabletTitleKey: String.LocalizationValue {
+        switch sakuraTablet {
+        case .grey: "sakura_tablet_grey"
+        case .white: "sakura_tablet_white"
+        case .taupe: "sakura_tablet_taupe"
+        case .charcoal: "sakura_tablet_charcoal"
+        case .paper: "sakura_tablet_paper"
+        case .glass: "sakura_tablet_glass"
+        }
     }
 
     private var tableTitleKey: String.LocalizationValue {
@@ -529,8 +602,9 @@ struct GameView: View {
         return false
     }
 
-    private var showsTurnTimer: Bool { !isLocalPassPlay }
-    private var showsPerspectiveChip: Bool { !isLocalPassPlay }
+    private var locksTo2D: Bool { isLocalPassPlay && skin != .sakura }
+    private var showsTurnTimer: Bool { !isLocalPassPlay || skin == .sakura }
+    private var showsPerspectiveChip: Bool { !isLocalPassPlay || skin == .sakura }
 
     private var isLocalTurn: Bool {
         guard let match = gameCenter.activeMatch else { return true }
@@ -569,7 +643,7 @@ struct GameView: View {
         }
         applyBoardLook()
         scene.syncBoard(game.model, winningLine: nil)
-        scene.setPerspective3D(isLocalPassPlay ? false : is3DView)
+        scene.setPerspective3D(locksTo2D ? false : is3DView)
         refreshInteraction()
         if shouldStartAI {
             Task { await playAI() }
@@ -594,6 +668,7 @@ struct GameView: View {
         guard canAct, game.phase == .place else { return }
         let player = game.currentPlayer
         guard game.place(at: position) else { return }
+        WaxlinePerf.event("place.tap", "skin=\(skin) table=\(sakuraShowsTable)")
         scene.dropSeal(at: position, player: player)
         HapticsService.place(enabled: settings.hapticsEnabled)
         SoundService.place(enabled: settings.soundEnabled)
@@ -638,12 +713,28 @@ struct GameView: View {
         }
     }
 
+    private func applyBoardSurfaces() {
+        scene.applySurfaces(
+            table: settings.tableFinish,
+            tablet: settings.tabletFinish,
+            skin: skin,
+            sakuraTable: sakuraTable,
+            sakuraTablet: sakuraTablet,
+            showTable: sakuraShowsTable
+        )
+    }
+
     private func applyBoardLook() {
         scene.applyLook(
-            dark: settings.boardDark,
+            dark: isDark,
             seals: settings.sealPalette,
             table: settings.tableFinish,
-            tablet: settings.tabletFinish
+            tablet: settings.tabletFinish,
+            clearCanvas: skin == .sakura,
+            skin: skin,
+            sakuraTable: sakuraTable,
+            sakuraTablet: sakuraTablet,
+            showTable: sakuraShowsTable
         )
     }
 

@@ -14,9 +14,14 @@ final class BoardSceneController: NSObject {
     private let boardRoot = SCNNode()
     private var tableNode = SCNNode()
     private var sealPalette: SealPalette = .classic
+    private var boardSkin: GameSkin = .classic
+    private var ambientLightNode = SCNNode()
+    private var sunLightNode = SCNNode()
+    private var fillLightNode = SCNNode()
     private var quadrantNodes: [Quadrant: SCNNode] = [:]
     private var cellNodes: [String: SCNNode] = [:]
     private var sealNodes: [String: SCNNode] = [:]
+    private var sealTemplates: [String: SCNNode] = [:]
 
     private var allowsCellTaps = true
     private var allowsQuadrantTaps = false
@@ -147,24 +152,28 @@ final class BoardSceneController: NSObject {
     }
 
     func syncBoard(_ model: BoardModel, winningLine: [Position]?) {
-        clearWinHighlight()
-        for row in 0..<6 {
-            for col in 0..<6 {
-                let key = cellKey(row: row, col: col)
-                updateSeal(key: key, cell: model.cells[row][col], glow: false)
+        WaxlinePerf.measure("syncBoard") {
+            clearWinHighlight()
+            for row in 0..<6 {
+                for col in 0..<6 {
+                    let key = cellKey(row: row, col: col)
+                    updateSeal(key: key, cell: model.cells[row][col], glow: false)
+                }
             }
-        }
-        if let winningLine {
-            showWin(line: winningLine, model: model)
+            if let winningLine {
+                showWin(line: winningLine, model: model)
+            }
         }
     }
 
     func dropSeal(at position: Position, player: Player) {
-        let key = cellKey(row: position.row, col: position.col)
-        updateSeal(key: key, cell: player.cell, glow: false)
-        if let node = sealNodes[key] {
-            node.position.y = 0.7 * playScale
-            node.runAction(.moveBy(x: 0, y: Double(-0.63 * playScale), z: 0, duration: 0.22))
+        WaxlinePerf.measure("dropSeal \(position.row),\(position.col)") {
+            let key = cellKey(row: position.row, col: position.col)
+            updateSeal(key: key, cell: player.cell, glow: false)
+            if let node = sealNodes[key] {
+                node.position.y = 0.7 * playScale
+                node.runAction(.moveBy(x: 0, y: Double(-0.63 * playScale), z: 0, duration: 0.22))
+            }
         }
     }
 
@@ -173,6 +182,7 @@ final class BoardSceneController: NSObject {
             completion()
             return
         }
+        WaxlinePerf.event("rotate.start", "\(quadrant)")
         isAnimating = true
         allowsCellTaps = false
         allowsQuadrantTaps = false
@@ -196,6 +206,7 @@ final class BoardSceneController: NSObject {
     }
 
     private func finishRotation(quadrant: Quadrant, model: BoardModel) {
+        WaxlinePerf.event("rotate.finish", "\(quadrant)")
         quadrantNodes[quadrant]?.eulerAngles.y = 0
         syncBoard(model, winningLine: nil)
         selectedQuadrant = nil
@@ -205,32 +216,163 @@ final class BoardSceneController: NSObject {
         done?()
     }
 
-    func applyLook(dark: Bool, seals: SealPalette, table: TableFinish, tablet: TabletFinish) {
+    func applyLook(
+        dark: Bool,
+        seals: SealPalette,
+        table: TableFinish,
+        tablet: TabletFinish,
+        clearCanvas: Bool = false,
+        skin: GameSkin = .classic,
+        sakuraTable: SakuraTableTheme = .oak,
+        sakuraTablet: SakuraTabletTheme = .grey,
+        showTable: Bool = true
+    ) {
+        let t0 = CFAbsoluteTimeGetCurrent()
+        let previousSkin = boardSkin
+        let previousPalette = sealPalette
         sealPalette = seals
-        scene.background.contents = dark ? PaperStyle.darkCanvas : PaperStyle.cream
-        scnView?.backgroundColor = dark ? PaperStyle.darkCanvas : PaperStyle.cream
-        let wood = PaperStyle.tableMaterial(table)
+        boardSkin = skin
+        if clearCanvas {
+            scene.background.contents = UIColor.clear
+            scnView?.backgroundColor = .clear
+            scnView?.isOpaque = false
+            scnView?.layer.isOpaque = false
+        } else {
+            scene.background.contents = dark ? PaperStyle.darkCanvas : PaperStyle.cream
+            scnView?.backgroundColor = dark ? PaperStyle.darkCanvas : PaperStyle.cream
+            scnView?.isOpaque = true
+            scnView?.layer.isOpaque = true
+        }
+        applyLighting(skin: skin, dark: dark)
+        if skin == .sakura {
+            scene.lightingEnvironment.contents = PaperStyle.sakuraLightingCube()
+            scene.lightingEnvironment.intensity = dark ? 0.38 : 0.52
+        } else {
+            scene.lightingEnvironment.contents = PaperStyle.waxLightingCube()
+            scene.lightingEnvironment.intensity = 0.45
+        }
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0
+        let wood = PaperStyle.tableMaterial(table, skin: skin, sakuraTable: sakuraTable)
         tableNode.geometry?.materials = [wood, wood, wood, wood, wood, wood]
+        tableNode.isHidden = !showTable
         for (quadrant, node) in quadrantNodes {
-            let top = PaperStyle.tabletMaterial(tablet, recessed: false, offset: Float(quadrant.rawValue) * 0.17)
-            let edge = PaperStyle.tabletMaterial(tablet, recessed: true, offset: Float(quadrant.rawValue) * 0.11)
-            paintTablet(node, top: top, edge: edge)
+            let top = PaperStyle.tabletMaterial(tablet, recessed: false, offset: Float(quadrant.rawValue) * 0.17, skin: skin, sakuraTablet: sakuraTablet)
+            let edge = PaperStyle.tabletMaterial(tablet, recessed: true, offset: Float(quadrant.rawValue) * 0.11, skin: skin, sakuraTablet: sakuraTablet)
+            paintTablet(node, top: top, edge: edge, glass: skin == .sakura && sakuraTablet == .glass)
+        }
+        SCNTransaction.commit()
+        scnView?.antialiasingMode = clearCanvas ? .none : .multisampling4X
+        setTabletShadowsVisible(!(skin == .sakura && sakuraTablet == .glass))
+        if previousSkin != skin || previousPalette != seals {
+            warmSealTemplates()
+        }
+        let ms = (CFAbsoluteTimeGetCurrent() - t0) * 1000
+        WaxlinePerf.event(
+            "applyLook.done",
+            String(format: "%.1fms skin=\(skin) table=\(showTable) msaa=\(clearCanvas ? "none" : "4x")", ms)
+        )
+    }
+
+    func applySurfaces(
+        table: TableFinish,
+        tablet: TabletFinish,
+        skin: GameSkin = .classic,
+        sakuraTable: SakuraTableTheme = .oak,
+        sakuraTablet: SakuraTabletTheme = .grey,
+        showTable: Bool = true
+    ) {
+        let t0 = CFAbsoluteTimeGetCurrent()
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0
+        let wood = PaperStyle.tableMaterial(table, skin: skin, sakuraTable: sakuraTable)
+        tableNode.geometry?.materials = [wood, wood, wood, wood, wood, wood]
+        tableNode.isHidden = !showTable
+        for (quadrant, node) in quadrantNodes {
+            let top = PaperStyle.tabletMaterial(tablet, recessed: false, offset: Float(quadrant.rawValue) * 0.17, skin: skin, sakuraTablet: sakuraTablet)
+            let edge = PaperStyle.tabletMaterial(tablet, recessed: true, offset: Float(quadrant.rawValue) * 0.11, skin: skin, sakuraTablet: sakuraTablet)
+            paintTablet(node, top: top, edge: edge, glass: skin == .sakura && sakuraTablet == .glass)
+        }
+        setTabletShadowsVisible(!(skin == .sakura && sakuraTablet == .glass))
+        SCNTransaction.commit()
+        let ms = (CFAbsoluteTimeGetCurrent() - t0) * 1000
+        WaxlinePerf.event("applyLook.surfaces", String(format: "%.1fms", ms))
+    }
+
+    func setTableVisible(_ visible: Bool) {
+        tableNode.isHidden = !visible
+        WaxlinePerf.event("table.visible", "\(visible)")
+    }
+
+    private func warmSealTemplates() {
+        for player in Player.allCases {
+            let color = PaperStyle.waxColor(for: player, palette: sealPalette, skin: boardSkin)
+            let motif = (sealPalette == .mono && player == .indigo) ? PaperStyle.waxBlack : UIColor(red: 0.95, green: 0.82, blue: 0.45, alpha: 1)
+            let probeName = "seal_gpu_warm_\(player.rawValue)"
+            _ = clonedSeal(color: color, motifColor: motif, glow: false)
+            if boardRoot.childNode(withName: probeName, recursively: false) == nil {
+                let probe = clonedSeal(color: color, motifColor: motif, glow: false)
+                probe.name = probeName
+                probe.isHidden = true
+                probe.position = SCNVector3(0, -8, 0)
+                boardRoot.addChildNode(probe)
+            }
         }
     }
 
-    private func paintTablet(_ node: SCNNode, top: SCNMaterial, edge: SCNMaterial) {
+    private func applyLighting(skin: GameSkin, dark: Bool = false) {
+        if skin == .sakura, dark {
+            ambientLightNode.light?.color = UIColor(red: 0.62, green: 0.60, blue: 0.66, alpha: 1)
+            ambientLightNode.light?.intensity = 320
+            sunLightNode.light?.color = UIColor(red: 0.82, green: 0.80, blue: 0.86, alpha: 1)
+            sunLightNode.light?.intensity = 420
+            fillLightNode.light?.color = UIColor(red: 0.55, green: 0.50, blue: 0.62, alpha: 1)
+            fillLightNode.light?.intensity = 180
+            sunLightNode.light?.castsShadow = false
+        } else if skin == .sakura {
+            ambientLightNode.light?.color = UIColor(red: 0.96, green: 0.96, blue: 0.98, alpha: 1)
+            ambientLightNode.light?.intensity = 460
+            sunLightNode.light?.color = UIColor(red: 1.00, green: 0.99, blue: 0.97, alpha: 1)
+            sunLightNode.light?.intensity = 580
+            fillLightNode.light?.color = UIColor(red: 0.86, green: 0.88, blue: 0.94, alpha: 1)
+            fillLightNode.light?.intensity = 220
+            sunLightNode.light?.castsShadow = false
+        } else {
+            ambientLightNode.light?.color = UIColor(white: 0.48, alpha: 1)
+            ambientLightNode.light?.intensity = 380
+            sunLightNode.light?.color = UIColor(red: 1, green: 0.96, blue: 0.88, alpha: 1)
+            sunLightNode.light?.intensity = 720
+            fillLightNode.light?.color = UIColor(red: 0.95, green: 0.9, blue: 1, alpha: 1)
+            fillLightNode.light?.intensity = 260
+            sunLightNode.light?.castsShadow = true
+        }
+    }
+
+    private func setTabletShadowsVisible(_ visible: Bool) {
+        for node in quadrantNodes.values {
+            node.childNode(withName: "quad_shadow", recursively: false)?.isHidden = !visible
+        }
+    }
+
+    private func paintTablet(_ node: SCNNode, top: SCNMaterial, edge: SCNMaterial, glass: Bool = false) {
         let name = node.name ?? ""
-        let isWell = name.hasPrefix("cell_")
-        let isTablet = name.hasPrefix("quad_")
-        if (isWell || isTablet), let box = node.geometry as? SCNBox {
-            if isWell {
+        if name.hasSuffix("_floor") {
+            node.isHidden = glass
+            if !glass, let box = node.geometry as? SCNBox {
                 box.materials = [edge]
+            }
+        } else if name.hasSuffix("_wall") || name.hasSuffix("_grid"), let box = node.geometry as? SCNBox {
+            node.isHidden = false
+            box.materials = [edge]
+        } else if name.hasPrefix("quad_"), let box = node.geometry as? SCNBox {
+            if glass {
+                box.materials = [top, top, top, top, top, top]
             } else {
                 box.materials = [edge, edge, edge, edge, top, edge]
             }
         }
         for child in node.childNodes {
-            paintTablet(child, top: top, edge: edge)
+            paintTablet(child, top: top, edge: edge, glass: glass)
         }
     }
 
@@ -247,6 +389,7 @@ final class BoardSceneController: NSObject {
     }
 
     func beginTablePan(at viewPoint: CGPoint, in view: SCNView) {
+        WaxlinePerf.event("table.spin.start", "hidden=\(tableNode.isHidden)")
         boardRoot.position = boardRestPosition
         panStartAngle = restYaw
         panTabletDelta = 0
@@ -268,16 +411,21 @@ final class BoardSceneController: NSObject {
         guard let now = worldXZ(from: viewPoint, in: view) else { return }
         let vector = now - panTabletCenter
         guard simd_length(vector) > 0.12 else { return }
-        boardRoot.position = boardRestPosition
         let angle = fingerAngle(at: now, center: panTabletCenter)
         panUnwrappedDelta += wrappedDelta(from: panLastFingerAngle, to: angle)
         panLastFingerAngle = angle
         let limit = Float.pi / 2
         panTabletDelta = min(max(panUnwrappedDelta, -limit), limit)
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0
+        SCNTransaction.disableActions = true
+        boardRoot.position = boardRestPosition
         boardRoot.eulerAngles.y = panStartAngle + panTabletDelta
+        SCNTransaction.commit()
     }
 
     func endTablePan() {
+        WaxlinePerf.event("table.spin.end", String(format: "delta=%.2f hidden=%@", panTabletDelta, String(describing: tableNode.isHidden)))
         guard !isAnimating else {
             snapBoard(to: restYaw)
             return
@@ -290,6 +438,7 @@ final class BoardSceneController: NSObject {
     }
 
     private func beginTabletPan(at viewPoint: CGPoint, in view: SCNView) {
+        WaxlinePerf.event("tablet.spin.start", "\(panQuadrant?.rawValue ?? -1)")
         guard let quadrant = panQuadrant, let node = quadrantNodes[quadrant] else { return }
         selectTablet(quadrant)
         panStartTabletYaw = node.eulerAngles.y
@@ -312,10 +461,15 @@ final class BoardSceneController: NSObject {
         panLastFingerAngle = angle
         let limit = Float.pi / 2
         panTabletDelta = min(max(panUnwrappedDelta, -limit), limit)
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0
+        SCNTransaction.disableActions = true
         node.eulerAngles.y = panStartTabletYaw + panTabletDelta
+        SCNTransaction.commit()
     }
 
     private func endTabletPan() {
+        WaxlinePerf.event("tablet.spin.end", String(format: "delta=%.2f", panTabletDelta))
         guard allowsQuadrantTaps, !isAnimating else { return }
         if abs(panTabletDelta) > 0.28, let quadrant = panQuadrant {
             onRotateGesture?(quadrant, panTabletDelta < 0)
@@ -511,6 +665,7 @@ final class BoardSceneController: NSObject {
         ambient.light?.color = UIColor(white: 0.48, alpha: 1)
         ambient.light?.intensity = 380
         scene.rootNode.addChildNode(ambient)
+        ambientLightNode = ambient
 
         let sun = SCNNode()
         sun.light = SCNLight()
@@ -528,6 +683,7 @@ final class BoardSceneController: NSObject {
         sun.eulerAngles = SCNVector3(-0.95, 0.55, 0)
         sun.position = SCNVector3(5, 11, 6)
         scene.rootNode.addChildNode(sun)
+        sunLightNode = sun
 
         let fill = SCNNode()
         fill.light = SCNLight()
@@ -536,6 +692,7 @@ final class BoardSceneController: NSObject {
         fill.light?.color = UIColor(red: 0.95, green: 0.9, blue: 1, alpha: 1)
         fill.position = SCNVector3(-5, 6, 4)
         scene.rootNode.addChildNode(fill)
+        fillLightNode = fill
 
         let table = SCNBox(width: CGFloat(tableSize), height: 0.12, length: CGFloat(tableSize), chamferRadius: 0.16)
         let wood = PaperStyle.woodMaterial()
@@ -623,6 +780,7 @@ final class BoardSceneController: NSObject {
         shadowMat.isDoubleSided = true
         shadow.materials = [shadowMat]
         let shadowNode = SCNNode(geometry: shadow)
+        shadowNode.name = "quad_shadow"
         shadowNode.eulerAngles.x = -.pi / 2
         shadowNode.position.y = -0.14
         shadowNode.castsShadow = false
@@ -652,7 +810,7 @@ final class BoardSceneController: NSObject {
             geometry.materials = [edge, edge, edge, edge, cream, edge]
             let barNode = SCNNode(geometry: geometry)
             barNode.position = SCNVector3(x, 0.24 * slab, 0)
-            barNode.name = node.name
+            barNode.name = "quad_grid"
             node.addChildNode(barNode)
         }
         for z in xs {
@@ -660,7 +818,7 @@ final class BoardSceneController: NSObject {
             geometry.materials = [edge, edge, edge, edge, cream, edge]
             let barNode = SCNNode(geometry: geometry)
             barNode.position = SCNVector3(0, 0.24 * slab, z)
-            barNode.name = node.name
+            barNode.name = "quad_grid"
             node.addChildNode(barNode)
         }
     }
@@ -679,7 +837,7 @@ final class BoardSceneController: NSObject {
         let floor = SCNBox(width: CGFloat(well), height: CGFloat(0.02 * slab), length: CGFloat(well), chamferRadius: CGFloat(0.02 * slab))
         floor.materials = [PaperStyle.graniteMaterial(dark: true, offset: 0.22)]
         let floorNode = SCNNode(geometry: floor)
-        floorNode.name = "cell_\(row)_\(col)"
+        floorNode.name = "cell_\(row)_\(col)_floor"
         node.addChildNode(floorNode)
 
         let wallH: Float = 0.055 * slab
@@ -697,7 +855,7 @@ final class BoardSceneController: NSObject {
         let inset = well / 2 - wallT / 2
         func wallNode(_ geometry: SCNGeometry, x: Float, z: Float) -> SCNNode {
             let wall = SCNNode(geometry: geometry)
-            wall.name = "cell_\(row)_\(col)"
+            wall.name = "cell_\(row)_\(col)_wall"
             wall.position = SCNVector3(x, wallY, z)
             return wall
         }
@@ -715,12 +873,26 @@ final class BoardSceneController: NSObject {
         sealNodes[key] = nil
         guard cell != .empty, let parent = cellNodes[key] else { return }
         let player: Player = cell == .red ? .red : .indigo
-        let color = PaperStyle.waxColor(for: player, palette: sealPalette)
+        let color = PaperStyle.waxColor(for: player, palette: sealPalette, skin: boardSkin)
         let motifColor = (sealPalette == .mono && player == .indigo) ? PaperStyle.waxBlack : UIColor(red: 0.95, green: 0.82, blue: 0.45, alpha: 1)
-        let seal = makeSeal(color: color, motifColor: motifColor, glow: glow)
+        let seal = clonedSeal(color: color, motifColor: motifColor, glow: glow)
         seal.position.y = 0.07 * playScale
         parent.addChildNode(seal)
         sealNodes[key] = seal
+    }
+
+    private func clonedSeal(color: UIColor, motifColor: UIColor, glow: Bool) -> SCNNode {
+        if glow {
+            return makeSeal(color: color, motifColor: motifColor, glow: true)
+        }
+        let key = "\(boardSkin)-\(sealPalette.rawValue)-\(color.hash)-\(motifColor.hash)"
+        if let template = sealTemplates[key] {
+            return template.clone()
+        }
+        WaxlinePerf.event("seal.template.miss", key)
+        let template = makeSeal(color: color, motifColor: motifColor, glow: false)
+        sealTemplates[key] = template
+        return template.clone()
     }
 
     private func makeSeal(color: UIColor, motifColor: UIColor, glow: Bool) -> SCNNode {
@@ -730,7 +902,7 @@ final class BoardSceneController: NSObject {
             length: CGFloat(0.62 * playScale),
             chamferRadius: CGFloat(0.12 * playScale)
         )
-        let material = PaperStyle.waxMaterial(color: color)
+        let material = PaperStyle.waxMaterial(color: color, skin: boardSkin)
         if glow {
             material.emission.contents = color.withAlphaComponent(0.9)
         }
@@ -738,7 +910,7 @@ final class BoardSceneController: NSObject {
         let node = SCNNode(geometry: box)
 
         let motif = SCNShape(path: PaperStyle.starPath(scale: CGFloat(playScale)), extrusionDepth: CGFloat(0.03 * playScale))
-        let motifMat = PaperStyle.waxMaterial(color: motifColor)
+        let motifMat = PaperStyle.waxMaterial(color: motifColor, skin: boardSkin)
         motifMat.metalness.contents = 0.35
         motifMat.roughness.contents = 0.28
         if glow {
