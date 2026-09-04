@@ -3,6 +3,7 @@ import SwiftUI
 struct ResultSheet: View {
     var game: GameState
     var skin: GameSkin = .classic
+    var seals: SealPalette = .classic
     var onAgain: () -> Void
     var onMenu: () -> Void
     @Environment(SettingsStore.self) private var settings
@@ -13,36 +14,77 @@ struct ResultSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 14) {
             SealMark(
                 color: badgeColor,
                 motif: badgeMotif,
                 outline: badgeOutline
             )
-                .frame(width: 72, height: 72)
-                .padding(.top, 12)
+            .frame(width: 44, height: 44)
+            .padding(.top, 8)
+
             Text(title)
-                .font(.system(.title, design: .serif).weight(.semibold))
-                .foregroundStyle(Theme.ink(dark: isDark))
+                .font(.system(.title3, design: .serif).weight(.semibold))
+                .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
-            HStack(spacing: 12) {
+
+            VStack(spacing: 10) {
                 if game.mode != .gameCenter {
-                    Button(t("play_again"), action: onAgain)
-                        .buttonStyle(WaxButtonStyle(fill: Theme.waxRed))
+                    resultAction(t("play_again"), prominent: true, action: onAgain)
                 }
-                Button(t("menu"), action: onMenu)
-                    .buttonStyle(WaxButtonStyle(fill: Theme.ink(dark: isDark), label: isDark ? Theme.canvas(dark: true) : Theme.cream))
+                resultAction(t("menu"), prominent: false, action: onMenu)
             }
-            .padding(.horizontal, 20)
-            Spacer()
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.canvas(dark: isDark))
-        .preferredColorScheme(isDark ? .dark : .light)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+        .presentationDetents([.height(248)])
+        .presentationDragIndicator(.hidden)
+        .interactiveDismissDisabled()
+        .preferredColorScheme(sheetScheme)
     }
 
-    private var isDark: Bool { settings.boardDark }
+    private func resultAction(_ title: String, prominent: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(.body, design: .serif).weight(prominent ? .semibold : .medium))
+                .foregroundStyle(prominent ? prominentLabel : secondaryLabel)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(prominent ? prominentFill : secondaryFill, in: Capsule())
+                .overlay {
+                    Capsule().stroke(prominent ? Color.clear : secondaryStroke, lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var sheetDark: Bool {
+        if skin == .sakura { return seals == .mono }
+        return settings.boardDark
+    }
+
+    private var sheetScheme: ColorScheme { sheetDark ? .dark : .light }
+
+    private var prominentFill: Color {
+        sheetDark ? Color.white.opacity(0.16) : Theme.waxRed
+    }
+
+    private var prominentLabel: Color {
+        sheetDark ? Theme.ink(dark: true) : Theme.cream
+    }
+
+    private var secondaryFill: Color {
+        sheetDark ? Color.white.opacity(0.08) : Theme.chipFill(dark: false)
+    }
+
+    private var secondaryLabel: Color {
+        Theme.ink(dark: sheetDark)
+    }
+
+    private var secondaryStroke: Color {
+        Theme.ink(dark: sheetDark).opacity(0.35)
+    }
 
     private var title: String {
         switch game.status {
@@ -58,7 +100,7 @@ struct ResultSheet: View {
                 let local = gameCenter.localPlayerColor(in: match)
                 return player == local ? t("you_win") : t("you_lose")
             }
-            if settings.sealPalette == .mono {
+            if seals == .mono {
                 return player == .red ? t("black_wins") : t("white_wins")
             }
             return player == .red ? t("red_wins") : t("indigo_wins")
@@ -68,7 +110,7 @@ struct ResultSheet: View {
     private var badgeColor: Color {
         switch game.status {
         case .won(let player, _):
-            Theme.seal(player, palette: settings.sealPalette, skin: skin)
+            Theme.seal(player, palette: seals, skin: skin)
         default:
             Theme.gold
         }
@@ -76,7 +118,7 @@ struct ResultSheet: View {
 
     private var isWhiteWin: Bool {
         if case .won(let player, _) = game.status {
-            return settings.sealPalette == .mono && player == .indigo
+            return seals == .mono && player == .indigo
         }
         return false
     }
@@ -86,8 +128,8 @@ struct ResultSheet: View {
     }
 
     private var badgeOutline: Color? {
-        guard settings.sealPalette == .mono else { return nil }
-        if isDark, case .won(let player, _) = game.status, player == .red {
+        guard seals == .mono else { return nil }
+        if sheetDark, case .won(let player, _) = game.status, player == .red {
             return Theme.ink(dark: true).opacity(0.7)
         }
         if isWhiteWin {

@@ -92,7 +92,6 @@ struct RootView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
-                .presentationDetents([.medium])
         }
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView {

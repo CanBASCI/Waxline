@@ -1326,6 +1326,40 @@
         }
       }
     },
+    "sakura_look_mono" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Black / White"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siyah / Beyaz"
+          }
+        }
+      }
+    },
+    "sakura_look_color" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renkli"
+          }
+        }
+      }
+    },
     "sakura_tablet_glass" : {
       "extractionState" : "manual",
       "localizations" : {

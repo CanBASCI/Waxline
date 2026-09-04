@@ -60,6 +60,11 @@ enum GameSkin: Equatable {
     case sakura
 }
 
+enum SakuraLook: String, Sendable, CaseIterable {
+    case color
+    case mono
+}
+
 enum AILevel: String, Sendable, Codable, CaseIterable, Identifiable {
     case easy
     case medium

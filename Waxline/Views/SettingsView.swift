@@ -8,8 +8,6 @@ struct SettingsView: View {
         L10n.text(key, language: settings.language)
     }
 
-    private var menuFont: Font { .system(.body, design: .serif).weight(.medium) }
-
     var body: some View {
         @Bindable var settings = settings
         NavigationStack {
@@ -34,20 +32,16 @@ struct SettingsView: View {
                     }
                 }
             }
-            .font(menuFont)
-            .contentMargins(.top, 14, for: .scrollContent)
+            .scrollContentBackground(.hidden)
             .navigationTitle(t("settings_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text(t("settings_title"))
-                        .font(menuFont)
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(t("done")) { dismiss() }
-                        .font(menuFont)
                 }
             }
         }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
     }
 }
