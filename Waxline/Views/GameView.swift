@@ -15,7 +15,7 @@ struct GameView: View {
     @State private var showLookPanel = false
     @State private var sakuraDark = false
     @State private var sakuraTable: SakuraTableTheme = .oak
-    @State private var sakuraTablet: SakuraTabletTheme = .glass
+    @State private var sakuraTablet: SakuraTabletTheme = .charcoal
     @State private var sakuraShowsTable = false
     @State private var resultTask: Task<Void, Never>?
     @State private var timerTask: Task<Void, Never>?
@@ -43,7 +43,7 @@ struct GameView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay {
                     CornerBrackets(cornerRadius: 12, length: 18)
-                        .stroke(ink.opacity(0.55), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        .stroke(boardInk.opacity(0.55), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                         .padding(1)
                         .allowsHitTesting(false)
                 }
@@ -115,16 +115,25 @@ struct GameView: View {
 
     private var header: some View {
         HStack {
-            Button(t("menu")) { onExit() }
-                .font(bannerFont)
-                .foregroundStyle(ink)
+            Button(action: onExit) {
+                Text(t("menu"))
+                    .font(bannerFont)
+                    .foregroundStyle(ink)
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
+                    .background(chromeFill, in: Capsule())
+                    .overlay {
+                        Capsule().stroke(ink.opacity(0.35), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
             Spacer(minLength: 8)
             lookMenu
+                .shadow(color: textHalo, radius: skin == .sakura ? 8 : 0)
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 0)
-        .shadow(color: textHalo, radius: skin == .sakura ? 8 : 0)
         .background {
             Color.clear
                 .contentShape(Rectangle())
@@ -179,7 +188,7 @@ struct GameView: View {
                 ForEach(Array(game.moveLog.enumerated()), id: \.element.id) { index, move in
                     Text(moveLine(move))
                         .font(.system(.subheadline, design: .serif).weight(index == 0 ? .medium : .regular))
-                        .foregroundStyle(ink.opacity(moveLogOpacity(index)))
+                        .foregroundStyle(overlayInk.opacity(moveLogOpacity(index)))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -190,7 +199,7 @@ struct GameView: View {
         .padding(.horizontal, 20)
         .padding(.top, 18)
         .padding(.bottom, 12)
-        .shadow(color: textHalo, radius: skin == .sakura ? 8 : 0)
+        .shadow(color: overlayHalo, radius: skin == .sakura ? 8 : 0)
         .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(t("last_move"))
@@ -264,8 +273,8 @@ struct GameView: View {
             if let message = boardStatusText {
                 Text(message)
                     .font(.system(.subheadline, design: .serif))
-                    .foregroundStyle(ink.opacity(0.7))
-                    .shadow(color: textHalo, radius: skin == .sakura ? 6 : 0)
+                    .foregroundStyle(overlayInk.opacity(0.7))
+                    .shadow(color: overlayHalo, radius: skin == .sakura ? 6 : 0)
                     .padding(.bottom, 16)
             }
         }
@@ -436,9 +445,25 @@ struct GameView: View {
         }
         return Theme.ink(dark: isDark)
     }
+    private var overlayInk: Color {
+        if skin == .sakura {
+            return Color(white: 1)
+        }
+        return ink
+    }
+    private var boardInk: Color {
+        if skin == .sakura {
+            return isDark ? Color(white: 0.96) : Color(white: 0.08)
+        }
+        return Theme.ink(dark: isDark)
+    }
     private var textHalo: Color {
         guard skin == .sakura else { return .clear }
         return isDark ? Color.black.opacity(0.55) : Color.white.opacity(0.8)
+    }
+    private var overlayHalo: Color {
+        guard skin == .sakura else { return .clear }
+        return Color.black.opacity(0.55)
     }
     private var chromeFill: Color {
         if skin == .sakura {

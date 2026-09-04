@@ -53,6 +53,11 @@ final class BoardSceneController: NSObject {
     private var boardRestPosition: SCNVector3 { SCNVector3(0, 0, -boardScreenLift) }
     private var sheetPad: Float { 0.08 * playScale }
     private var slab: Float { playScale * tabletThick }
+    private var boardPlayHalf: Float {
+        let span = cellSize * 1.5 + gap / 2
+        let tabletHalf = (cellSize * 3 + sheetPad) / 2
+        return span + tabletHalf
+    }
 
     override init() {
         super.init()
@@ -108,14 +113,17 @@ final class BoardSceneController: NSObject {
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0.28
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        let shrinkIdle = boardSkin == .sakura && canSelect && selectedQuadrant != nil
         for (quadrant, node) in quadrantNodes {
             let selected = selectedQuadrant == quadrant && canSelect
             if selected {
-                node.position = selectedPosition(for: quadrant)
-                node.scale = SCNVector3(1.045, 1.045, 1.045)
+                node.position = boardSkin == .sakura ? restPosition(for: quadrant) : selectedPosition(for: quadrant)
+                let grow: Float = boardSkin == .sakura ? 1 : 1.045
+                node.scale = SCNVector3(grow, grow, grow)
             } else {
                 node.position = restPosition(for: quadrant)
-                node.scale = SCNVector3(1, 1, 1)
+                let shrink: Float = shrinkIdle ? 0.88 : 1
+                node.scale = SCNVector3(shrink, shrink, shrink)
             }
         }
         SCNTransaction.commit()
@@ -193,6 +201,13 @@ final class BoardSceneController: NSObject {
             finishRotation(quadrant: quadrant, model: model)
             return
         }
+        if cameraTilt <= 0.35 {
+            let fit = tabletSpinFitScale(quadrant: quadrant, yaw: .pi / 4)
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 0
+            node.scale = SCNVector3(fit, fit, fit)
+            SCNTransaction.commit()
+        }
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0.38
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -207,7 +222,10 @@ final class BoardSceneController: NSObject {
 
     private func finishRotation(quadrant: Quadrant, model: BoardModel) {
         WaxlinePerf.event("rotate.finish", "\(quadrant)")
-        quadrantNodes[quadrant]?.eulerAngles.y = 0
+        if let node = quadrantNodes[quadrant] {
+            node.eulerAngles.y = 0
+            node.scale = SCNVector3(1, 1, 1)
+        }
         syncBoard(model, winningLine: nil)
         selectedQuadrant = nil
         isAnimating = false
@@ -399,29 +417,82 @@ final class BoardSceneController: NSObject {
         panTabletCenter = center
         let point = worldXZ(from: viewPoint, in: view) ?? center
         panLastFingerAngle = fingerAngle(at: point, center: center)
-        SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0.22
-        SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        boardRoot.scale = SCNVector3(tableSpinScale, tableSpinScale, tableSpinScale)
-        SCNTransaction.commit()
+        applyTableSpinPose(animated: cameraTilt > 0.35)
     }
 
     func updateTablePan(at viewPoint: CGPoint, in view: SCNView) {
         guard !isAnimating else { return }
         guard let now = worldXZ(from: viewPoint, in: view) else { return }
         let vector = now - panTabletCenter
-        guard simd_length(vector) > 0.12 else { return }
-        let angle = fingerAngle(at: now, center: panTabletCenter)
-        panUnwrappedDelta += wrappedDelta(from: panLastFingerAngle, to: angle)
-        panLastFingerAngle = angle
-        let limit = Float.pi / 2
-        panTabletDelta = min(max(panUnwrappedDelta, -limit), limit)
+        if simd_length(vector) > 0.08 {
+            let angle = fingerAngle(at: now, center: panTabletCenter)
+            panUnwrappedDelta += wrappedDelta(from: panLastFingerAngle, to: angle)
+            panLastFingerAngle = angle
+            let limit = Float.pi / 2
+            panTabletDelta = min(max(panUnwrappedDelta, -limit), limit)
+        }
+        applyTableSpinPose(animated: false)
+    }
+
+    private func applyTableSpinPose(animated: Bool) {
+        let yaw = panStartAngle + panTabletDelta
+        let fit = cameraTilt > 0.35 ? tableSpinScale : tableSpinFitScale(for: yaw)
         SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0
-        SCNTransaction.disableActions = true
+        SCNTransaction.animationDuration = animated ? 0.22 : 0
+        if animated {
+            SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        } else {
+            SCNTransaction.disableActions = true
+        }
         boardRoot.position = boardRestPosition
-        boardRoot.eulerAngles.y = panStartAngle + panTabletDelta
+        boardRoot.eulerAngles.y = yaw
+        boardRoot.scale = SCNVector3(fit, fit, fit)
         SCNTransaction.commit()
+    }
+
+    private func tableSpinFitScale(for yaw: Float) -> Float {
+        let limit = viewFitHalf * 0.80
+        let span = cellSize * 1.5 + gap / 2
+        let half = (cellSize * 3 + sheetPad) / 2
+        let cosine = cos(yaw)
+        let sine = sin(yaw)
+        var reach: Float = 0
+        for sx: Float in [-1, 1] {
+            for sz: Float in [-1, 1] {
+                let cx = sx * span
+                let cz = sz * span
+                for lx in [-half, half] {
+                    for lz in [-half, half] {
+                        let x = cx + lx
+                        let z = cz + lz
+                        let wx = x * cosine - z * sine
+                        let wz = x * sine + z * cosine
+                        reach = max(reach, abs(wx), abs(wz))
+                    }
+                }
+            }
+        }
+        return min(1, limit / max(reach, 0.1))
+    }
+
+    private func tabletSpinFitScale(quadrant: Quadrant, yaw: Float) -> Float {
+        let origin = boardSkin == .sakura ? restPosition(for: quadrant) : selectedPosition(for: quadrant)
+        let half = (cellSize * 3 + sheetPad) / 2
+        let limit = viewFitHalf * 0.94
+        let cosine = cos(yaw)
+        let sine = sin(yaw)
+        var fit: Float = 1
+        for lx in [-half, half] {
+            for lz in [-half, half] {
+                let dx = lx * cosine - lz * sine
+                let dz = lx * sine + lz * cosine
+                if dx > 0.0001 { fit = min(fit, (limit - origin.x) / dx) }
+                if dx < -0.0001 { fit = min(fit, (-limit - origin.x) / dx) }
+                if dz > 0.0001 { fit = min(fit, (limit - origin.z) / dz) }
+                if dz < -0.0001 { fit = min(fit, (-limit - origin.z) / dz) }
+            }
+        }
+        return min(1, max(0.88, fit))
     }
 
     func endTablePan() {
@@ -444,8 +515,8 @@ final class BoardSceneController: NSObject {
         panStartTabletYaw = node.eulerAngles.y
         panTabletDelta = 0
         panUnwrappedDelta = 0
-        let lifted = selectedPosition(for: quadrant)
-        let center = SIMD2(lifted.x, lifted.z)
+        let pivot = boardSkin == .sakura ? restPosition(for: quadrant) : selectedPosition(for: quadrant)
+        let center = SIMD2(pivot.x, pivot.z)
         panTabletCenter = center
         let point = boardXZ(from: viewPoint, in: view) ?? center
         panLastFingerAngle = fingerAngle(at: point, center: center)
@@ -461,10 +532,15 @@ final class BoardSceneController: NSObject {
         panLastFingerAngle = angle
         let limit = Float.pi / 2
         panTabletDelta = min(max(panUnwrappedDelta, -limit), limit)
+        let yaw = panStartTabletYaw + panTabletDelta
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0
         SCNTransaction.disableActions = true
-        node.eulerAngles.y = panStartTabletYaw + panTabletDelta
+        node.eulerAngles.y = yaw
+        if cameraTilt <= 0.35 {
+            let fit = tabletSpinFitScale(quadrant: quadrant, yaw: yaw)
+            node.scale = SCNVector3(fit, fit, fit)
+        }
         SCNTransaction.commit()
     }
 
@@ -480,6 +556,9 @@ final class BoardSceneController: NSObject {
             SCNTransaction.animationDuration = 0.28
             SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             node.eulerAngles.y = 0
+            if cameraTilt <= 0.35 {
+                node.scale = SCNVector3(1, 1, 1)
+            }
             SCNTransaction.commit()
         }
         clearTabletSelection()
@@ -768,7 +847,7 @@ final class BoardSceneController: NSObject {
         let width = CGFloat(cellSize * 3 + sheetPad)
         let top = PaperStyle.graniteMaterial(offset: Float(quadrant.rawValue) * 0.17)
         let edge = PaperStyle.graniteMaterial(dark: true, offset: Float(quadrant.rawValue) * 0.11)
-        let sheet = SCNBox(width: width, height: CGFloat(0.2 * slab), length: width, chamferRadius: CGFloat(0.045 * slab))
+        let sheet = SCNBox(width: width, height: CGFloat(0.28 * slab), length: width, chamferRadius: CGFloat(0.045 * slab))
         sheet.materials = [edge, edge, edge, edge, top, edge]
         let sheetNode = SCNNode(geometry: sheet)
         sheetNode.name = "quad_\(quadrant.rawValue)"
