@@ -20,9 +20,27 @@ struct GameView: View {
     @State private var turnSecondsLeft = 15
     @State private var boardRect: CGRect = .zero
     @State private var tableSpinActive = false
-    private let boardGutter: CGFloat = 30
+    @State private var canvasSize = CGSize(width: 390, height: 844)
+    private var isCompactCanvas: Bool { canvasSize.height < 720 }
+    private var boardGutter: CGFloat {
+        skin == .sakura && isCompactCanvas ? 16 : 30
+    }
+    private var moveLogSlotHeight: CGFloat {
+        skin == .sakura && isCompactCanvas ? 88 : 108
+    }
+    private var overlayTypeSize: CGFloat {
+        skin == .sakura && isCompactCanvas ? 14 : 16
+    }
+    private var sakuraBoardSide: CGFloat {
+        let chrome: CGFloat = 12 + 32
+            + boardGutter + 68 + 8
+            + 44
+            + 36
+            + 18 + moveLogSlotHeight + 8
+            + boardGutter
+        return min(canvasSize.width, max(200, canvasSize.height - chrome))
+    }
     private let boardBottomTrim: CGFloat = 40
-    private let moveLogSlotHeight: CGFloat = 108
     private let sealBaseSize: CGFloat = 16
     private let sealBaseStep: CGFloat = 3
     private let sealBaseRowGap: CGFloat = 8
@@ -45,58 +63,13 @@ struct GameView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            turnBanner
-            if skin == .sakura {
-                Spacer(minLength: 0)
-            }
-            BoardSceneView(controller: scene)
-                .aspectRatio(skin == .sakura ? 1 : 0.72, contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, skin == .sakura ? 0 : -boardBottomTrim)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay {
-                    CornerBrackets(cornerRadius: 12, length: 18)
-                        .stroke(boardInk.opacity(0.55), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                        .padding(1)
-                        .allowsHitTesting(false)
-                }
-                .overlay {
-                    if showLookPanel {
-                        Color.clear
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                withAnimation(.easeOut(duration: 0.25)) {
-                                    showLookPanel = false
-                                }
-                            }
-                    }
-                }
-                .overlay(alignment: .bottom) {
-                    if skin != .sakura, boardStatusText != nil {
-                        boardStatus
-                    }
-                }
-                .background {
-                    GeometryReader { geo in
-                        Color.clear.preference(key: BoardRectKey.self, value: geo.frame(in: .named("gameCanvas")))
-                    }
-                }
-                .padding(.top, 0)
-                .padding(.bottom, boardGutter)
-            if skin == .sakura {
-                VStack(spacing: 0) {
-                    boardStatus
-                    footer
-                }
-            } else {
-                footer
-                Spacer(minLength: 0)
-            }
+        GeometryReader { geo in
+            playStack
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+                .onAppear { canvasSize = geo.size }
+                .onChange(of: geo.size) { _, size in canvasSize = size }
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .coordinateSpace(name: "gameCanvas")
         .onPreferenceChange(BoardRectKey.self) { boardRect = $0 }
         .contentShape(Rectangle())
@@ -154,17 +127,86 @@ struct GameView: View {
         }
     }
 
+    private var playStack: some View {
+        VStack(spacing: 0) {
+            header
+            turnBanner
+            if skin == .sakura {
+                Spacer(minLength: 0)
+                if showsTurnTimer || showsPerspectiveChip {
+                    HStack(alignment: .center, spacing: 8) {
+                        if showsTurnTimer {
+                            turnTimer
+                        }
+                        Spacer(minLength: 8)
+                        if showsPerspectiveChip {
+                            perspectiveChip
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+                }
+            }
+            BoardSceneView(controller: scene)
+                .aspectRatio(skin == .sakura ? 1 : 0.72, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .frame(width: skin == .sakura ? sakuraBoardSide : nil, height: skin == .sakura ? sakuraBoardSide : nil)
+                .fixedSize(horizontal: false, vertical: skin != .sakura)
+                .padding(.bottom, skin == .sakura ? 0 : -boardBottomTrim)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay {
+                    CornerBrackets(cornerRadius: 12, length: 18)
+                        .stroke(boardInk.opacity(0.55), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        .padding(1)
+                        .allowsHitTesting(false)
+                }
+                .overlay {
+                    if showLookPanel {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                withAnimation(.easeOut(duration: 0.25)) {
+                                    showLookPanel = false
+                                }
+                            }
+                    }
+                }
+                .overlay(alignment: .bottom) {
+                    if skin != .sakura, boardStatusText != nil {
+                        boardStatus
+                    }
+                }
+                .background {
+                    GeometryReader { geo in
+                        Color.clear.preference(key: BoardRectKey.self, value: geo.frame(in: .named("gameCanvas")))
+                    }
+                }
+                .padding(.top, 0)
+                .padding(.bottom, boardGutter)
+            if skin == .sakura {
+                VStack(spacing: 0) {
+                    boardStatus
+                    footer
+                }
+            } else {
+                footer
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
     private var header: some View {
         HStack {
             Button(action: onExit) {
                 Text(t("menu"))
                     .font(bannerFont)
-                    .foregroundStyle(ink)
+                    .foregroundStyle(hudChromeInk)
                     .padding(.horizontal, 12)
                     .frame(height: 32)
-                    .background(chromeFill, in: Capsule())
+                    .background(hudChromeFill, in: Capsule())
                     .overlay {
-                        Capsule().stroke(ink.opacity(0.35), lineWidth: 1)
+                        Capsule().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
                     }
             }
             .buttonStyle(.plain)
@@ -172,6 +214,7 @@ struct GameView: View {
             lookMenu
                 .shadow(color: textHalo, radius: skin == .sakura ? 8 : 0)
         }
+        .zIndex(1)
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 0)
@@ -191,19 +234,11 @@ struct GameView: View {
                     .frame(width: 22, height: 22)
                 Text(turnTitle)
                     .font(bannerFont)
-                    .foregroundStyle(titleColor)
+                    .foregroundStyle(skin == .sakura ? Theme.ink(dark: true) : titleColor)
+                    .modifier(OverlayReadable(enabled: skin == .sakura))
                 Spacer(minLength: 8)
-                if showsTurnTimer {
-                    Text("\(max(turnSecondsLeft, 1))")
-                        .font(.system(.title2, design: .serif).weight(.medium))
-                        .monospacedDigit()
-                        .foregroundStyle(turnTimerColor)
-                        .frame(minWidth: 28, alignment: .center)
-                        .opacity(isHumanTurn && turnSecondsLeft > 0 ? 1 : 0)
-                        .animation(.easeInOut(duration: 0.18), value: turnSecondsLeft)
-                        .accessibilityLabel(t("turn_timer"))
-                        .accessibilityValue("\(turnSecondsLeft)")
-                        .accessibilityHidden(!(isHumanTurn && turnSecondsLeft > 0))
+                if showsTurnTimer, skin != .sakura {
+                    turnTimer
                 }
             }
             HStack(alignment: .center, spacing: 8) {
@@ -211,14 +246,14 @@ struct GameView: View {
                     turnSteps
                 }
                 Spacer(minLength: 8)
-                if showsPerspectiveChip {
+                if showsPerspectiveChip, skin != .sakura {
                     perspectiveChip
                 }
             }
         }
         .padding(.horizontal, 20)
         .padding(.top, boardGutter)
-        .padding(.bottom, boardGutter)
+        .padding(.bottom, skin == .sakura ? 8 : boardGutter)
         .frame(maxWidth: .infinity, alignment: .leading)
         .shadow(color: textHalo, radius: skin == .sakura ? 8 : 0)
     }
@@ -229,7 +264,6 @@ struct GameView: View {
             sealReserve
         }
         .frame(maxWidth: .infinity, alignment: .bottom)
-        .border(Color.red, width: 1)
         .padding(.horizontal, 20)
         .padding(.top, 18)
         .padding(.bottom, skin == .sakura ? 2 : 12)
@@ -333,8 +367,8 @@ struct GameView: View {
 
     private var boardStatus: some View {
         Text(boardStatusText ?? " ")
-            .font(.system(.subheadline, design: .serif))
-            .foregroundStyle(skin == .sakura ? overlayInk.opacity(0.95) : overlayInk.opacity(0.7))
+            .font(skin == .sakura ? .system(size: overlayTypeSize, weight: .regular, design: .serif) : .system(.subheadline, design: .serif))
+            .foregroundStyle(skin == .sakura ? Theme.ink(dark: true) : overlayInk.opacity(0.7))
             .modifier(OverlayReadable(enabled: skin == .sakura))
             .shadow(color: skin == .sakura ? .clear : overlayHalo, radius: skin == .sakura ? 0 : 6)
             .opacity(boardStatusText == nil ? 0 : 1)
@@ -364,7 +398,6 @@ struct GameView: View {
     private var tableSpinGesture: some Gesture {
         DragGesture(minimumDistance: 10, coordinateSpace: .named("gameCanvas"))
             .onChanged { value in
-                guard skin != .sakura else { return }
                 guard boardRect.width > 8, !boardRect.contains(value.startLocation) else { return }
                 guard let view = scene.scnView else { return }
                 let point = CGPoint(
@@ -391,15 +424,16 @@ struct GameView: View {
 
     private var perspectiveChip: some View {
         Button {
+            finishTableSpin()
             is3DView.toggle()
             scene.setPerspective3D(is3DView)
             HapticsService.select(enabled: settings.hapticsEnabled)
         } label: {
             Text(is3DView ? t("view_3d") : t("view_2d"))
-                .font(.system(.subheadline, design: .serif).weight(.medium))
+                .font(skin == .sakura ? hudMeterFont : .system(.subheadline, design: .serif).weight(.medium))
                 .foregroundStyle(ink)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .padding(.horizontal, usesWhiteSealChrome ? 8 : 10)
+                .padding(.vertical, usesWhiteSealChrome ? 2 : 5)
                 .overlay {
                     Capsule().stroke(ink.opacity(0.35), lineWidth: 1)
                 }
@@ -409,66 +443,80 @@ struct GameView: View {
     }
 
     private var lookMenu: some View {
-        HStack(alignment: .center, spacing: 6) {
-            ZStack(alignment: .trailing) {
-                if showLookPanel {
-                    HStack(spacing: 6) {
-                        if skin == .sakura {
-                            lookChip(t(sakuraLook == .mono ? "sakura_look_mono" : "sakura_look_color")) {
-                                sakuraLook.cycle()
-                                applyBoardLook()
-                                scene.syncBoard(game.model, winningLine: nil)
-                            }
-                            lookChip(t(sakuraTabletTitleKey)) {
-                                sakuraTablet.cycle()
-                                applyBoardSurfaces()
-                            }
-                        } else {
-                            lookChip(isDark ? t("look_dark") : t("look_light")) {
-                                settings.boardDark.toggle()
-                                applyBoardLook()
-                            }
-                            lookChip(settings.sealPalette == .mono ? t("seal_mono") : t("seal_classic")) {
-                                settings.sealPalette.cycle()
-                                applyBoardLook()
-                                scene.syncBoard(game.model, winningLine: nil)
-                            }
-                        }
-                        if skin != .sakura {
-                            lookChip(t(tabletTitleKey)) {
-                                settings.tabletFinish.cycle()
-                                applyBoardSurfaces()
-                            }
-                            lookChip(t(tableTitleKey)) {
-                                settings.tableFinish.cycle()
-                                applyBoardSurfaces()
-                            }
-                        }
-                    }
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-                }
+        Button {
+            withAnimation(.easeOut(duration: 0.25)) {
+                showLookPanel.toggle()
             }
-            .clipped()
-
-            Button {
-                withAnimation(.easeOut(duration: 0.25)) {
-                    showLookPanel.toggle()
+            HapticsService.select(enabled: settings.hapticsEnabled)
+        } label: {
+            Image(systemName: showLookPanel ? "gearshape.fill" : "gearshape")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(hudChromeInk)
+                .frame(width: 32, height: 32)
+                .background(hudChromeFill, in: Circle())
+                .overlay {
+                    Circle().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
                 }
-                HapticsService.select(enabled: settings.hapticsEnabled)
-            } label: {
-                Image(systemName: showLookPanel ? "gearshape.fill" : "gearshape")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(ink)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(t("look_settings"))
+        .overlay(alignment: .topTrailing) {
+            VStack(alignment: .trailing, spacing: 6) {
+                Color.clear
                     .frame(width: 32, height: 32)
-                    .background(chromeFill, in: Circle())
-                    .overlay {
-                        Circle().stroke(ink.opacity(0.35), lineWidth: 1)
+                    .allowsHitTesting(false)
+                ZStack(alignment: .topTrailing) {
+                    if showLookPanel {
+                        VStack(alignment: .trailing, spacing: 6) {
+                            lookPanelChips
+                        }
+                        .fixedSize()
+                        .transition(.move(edge: .top).combined(with: .opacity))
                     }
+                }
+                .frame(width: 180, height: lookPanelClipHeight, alignment: .topTrailing)
+                .clipped()
+                .allowsHitTesting(showLookPanel)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(t("look_settings"))
         }
         .animation(.easeOut(duration: 0.25), value: showLookPanel)
+    }
+
+    private var lookPanelClipHeight: CGFloat {
+        skin == .sakura ? 76 : 152
+    }
+
+    @ViewBuilder
+    private var lookPanelChips: some View {
+        if skin == .sakura {
+            lookChip(t(sakuraLook == .mono ? "sakura_look_mono" : "sakura_look_color")) {
+                sakuraLook.cycle()
+                applyBoardLook()
+                scene.syncBoard(game.model, winningLine: nil)
+            }
+            lookChip(t(sakuraTabletTitleKey)) {
+                sakuraTablet.cycle()
+                applyBoardSurfaces()
+            }
+        } else {
+            lookChip(isDark ? t("look_dark") : t("look_light")) {
+                settings.boardDark.toggle()
+                applyBoardLook()
+            }
+            lookChip(settings.sealPalette == .mono ? t("seal_mono") : t("seal_classic")) {
+                settings.sealPalette.cycle()
+                applyBoardLook()
+                scene.syncBoard(game.model, winningLine: nil)
+            }
+            lookChip(t(tabletTitleKey)) {
+                settings.tabletFinish.cycle()
+                applyBoardSurfaces()
+            }
+            lookChip(t(tableTitleKey)) {
+                settings.tableFinish.cycle()
+                applyBoardSurfaces()
+            }
+        }
     }
 
     private func lookChip(_ title: String, action: @escaping () -> Void) -> some View {
@@ -478,12 +526,14 @@ struct GameView: View {
         } label: {
             Text(title)
                 .font(.system(.caption, design: .serif).weight(.semibold))
-                .foregroundStyle(ink)
-                .padding(.horizontal, 10)
+                .foregroundStyle(lookChipInk)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: true)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(chromeFill, in: Capsule())
+                .background(lookChipFill, in: Capsule())
                 .overlay {
-                    Capsule().stroke(ink.opacity(0.35), lineWidth: 1)
+                    Capsule().stroke(lookChipInk.opacity(0.35), lineWidth: 1)
                 }
         }
         .buttonStyle(.plain)
@@ -536,9 +586,36 @@ struct GameView: View {
         }
         return Theme.chipFill(dark: isDark)
     }
+    private var usesWhiteSealChrome: Bool { skin == .sakura && sakuraLook == .mono }
+    private var lookChipFill: Color {
+        if skin == .sakura, sakuraLook == .mono {
+            return Theme.waxWhite
+        }
+        return chromeFill
+    }
+    private var lookChipInk: Color {
+        if skin == .sakura, sakuraLook == .mono {
+            return Theme.ink
+        }
+        return ink
+    }
+    private var hudChromeFill: Color {
+        if skin == .sakura, sakuraLook == .mono {
+            return Theme.waxBlack
+        }
+        return chromeFill
+    }
+    private var hudChromeInk: Color {
+        if skin == .sakura, sakuraLook == .mono {
+            return Theme.cream
+        }
+        return skin == .sakura ? Theme.ink(dark: true) : ink
+    }
     private var bannerFont: Font { .system(.body, design: .serif).weight(.medium) }
+    private var hudMeterFont: Font { .system(.title2, design: .serif).weight(.medium) }
     private var turnTimerColor: Color {
-        turnSecondsLeft <= 5 ? Theme.waxRed : ink
+        if turnSecondsLeft <= 5 { return Theme.waxRed }
+        return usesWhiteSealChrome ? lookChipInk : ink
     }
 
     private var currentColor: Color {
@@ -633,7 +710,7 @@ struct GameView: View {
     private func logFont(index: Int) -> Font {
         let weight: Font.Weight = index == 0 ? .medium : .regular
         if skin == .sakura {
-            return .system(size: 16, weight: weight, design: .serif)
+            return .system(size: overlayTypeSize, weight: weight, design: .serif)
         }
         return .system(.subheadline, design: .serif).weight(weight)
     }
@@ -668,6 +745,27 @@ struct GameView: View {
         case .sw: t("quad_sw")
         case .se: t("quad_se")
         }
+    }
+
+    private var turnTimer: some View {
+        Text("\(max(turnSecondsLeft, 1))")
+            .font(hudMeterFont)
+            .monospacedDigit()
+            .foregroundStyle(turnTimerColor)
+            .frame(minWidth: 28, alignment: .center)
+            .padding(.horizontal, usesWhiteSealChrome ? 8 : 0)
+            .padding(.vertical, usesWhiteSealChrome ? 2 : 0)
+            .background(usesWhiteSealChrome ? lookChipFill : Color.clear, in: Capsule())
+            .overlay {
+                if usesWhiteSealChrome {
+                    Capsule().stroke(lookChipInk.opacity(0.35), lineWidth: 1)
+                }
+            }
+            .opacity(isHumanTurn && turnSecondsLeft > 0 ? 1 : 0)
+            .animation(.easeInOut(duration: 0.18), value: turnSecondsLeft)
+            .accessibilityLabel(t("turn_timer"))
+            .accessibilityValue("\(turnSecondsLeft)")
+            .accessibilityHidden(!(isHumanTurn && turnSecondsLeft > 0))
     }
 
     private var turnSteps: some View {
