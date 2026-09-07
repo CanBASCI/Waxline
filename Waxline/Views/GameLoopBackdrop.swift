@@ -33,7 +33,6 @@ struct GameLoopBackdrop: View {
         looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: url))
         player = queue
         queue.play()
-        WaxlinePerf.event("video.start", "\(resource).\(ext)")
     }
 
     private func stop() {

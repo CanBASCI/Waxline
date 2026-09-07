@@ -106,7 +106,7 @@ struct ResultSheet: View {
     private var badgeColor: Color {
         switch game.status {
         case .won(let player, _):
-            Theme.seal(player, palette: seals, skin: .sakura)
+            Theme.seal(player, palette: seals)
         default:
             Theme.gold
         }
@@ -132,19 +132,5 @@ struct ResultSheet: View {
             return Theme.ink.opacity(0.4)
         }
         return nil
-    }
-}
-
-struct WaxButtonStyle: ButtonStyle {
-    var fill: Color
-    var label: Color = Theme.cream
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(.headline, design: .serif).weight(.semibold))
-            .foregroundStyle(label)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(fill.opacity(configuration.isPressed ? 0.8 : 1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }

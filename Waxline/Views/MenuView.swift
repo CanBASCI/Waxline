@@ -35,7 +35,20 @@ struct MenuView: View {
 
                 VStack(alignment: .trailing, spacing: 14) {
                     textLink(t("menu_ai"), index: 0, action: onAI)
-                    textLink(t("menu_gamecenter"), index: 1, action: onGameCenter)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        textLink(
+                            t("menu_gamecenter"),
+                            index: 1,
+                            enabled: gameCenter.isAuthenticated,
+                            action: onGameCenter
+                        )
+                        if !gameCenter.isAuthenticated {
+                            Text(t("gc_sign_in"))
+                                .font(.footnote)
+                                .foregroundStyle(Theme.ink.opacity(0.55))
+                                .opacity(playback.didFinish ? 1 : 0)
+                        }
+                    }
                     textLink(t("menu_how_to_play"), index: 2, action: onHowToPlay)
                     textLink(t("menu_settings"), index: 3, action: onSettings)
                 }
@@ -43,16 +56,6 @@ struct MenuView: View {
                 .foregroundStyle(Theme.ink)
                 .shadow(color: Color.white.opacity(0.75), radius: 8)
                 .allowsHitTesting(playback.didFinish)
-                .overlay(alignment: .bottomTrailing) {
-                    if !gameCenter.isAuthenticated {
-                        Text(t("gc_sign_in"))
-                            .font(.footnote)
-                            .foregroundStyle(Theme.ink.opacity(0.55))
-                            .offset(y: 18)
-                            .opacity(playback.didFinish ? 1 : 0)
-                            .allowsHitTesting(false)
-                    }
-                }
             }
             .padding(.trailing, 22)
             .padding(.bottom, 36)
@@ -90,9 +93,16 @@ struct MenuView: View {
         }
     }
 
-    private func textLink(_ title: String, index: Int, action: @escaping () -> Void) -> some View {
+    private func textLink(
+        _ title: String,
+        index: Int,
+        enabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(title, action: action)
             .buttonStyle(.plain)
+            .disabled(!enabled)
+            .opacity(enabled ? 1 : 0.38)
             .menuLineMotion(revealed: playback.didFinish, idle: idle, index: index)
     }
 }

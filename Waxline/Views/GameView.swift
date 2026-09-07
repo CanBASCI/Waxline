@@ -19,8 +19,6 @@ struct GameView: View {
     @State private var resultTask: Task<Void, Never>?
     @State private var timerTask: Task<Void, Never>?
     @State private var turnSecondsLeft = 15
-    @State private var boardRect: CGRect = .zero
-    @State private var tableSpinActive = false
     @State private var canvasSize = CGSize(width: 390, height: 844)
     private var isCompactCanvas: Bool { canvasSize.height < 720 }
     private var boardGutter: CGFloat { isCompactCanvas ? 16 : 30 }
@@ -58,10 +56,6 @@ struct GameView: View {
                 .onChange(of: geo.size) { _, size in canvasSize = size }
         }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .coordinateSpace(name: "gameCanvas")
-        .onPreferenceChange(BoardRectKey.self) { boardRect = $0 }
-        .contentShape(Rectangle())
-        .simultaneousGesture(tableSpinGesture)
         .background {
             ZStack(alignment: .bottom) {
                 GameLoopBackdrop(
@@ -111,7 +105,6 @@ struct GameView: View {
         .onDisappear {
             resultTask?.cancel()
             stopTurnTimer()
-            finishTableSpin()
         }
     }
 
@@ -150,11 +143,6 @@ struct GameView: View {
                             }
                     }
                 }
-                .background {
-                    GeometryReader { geo in
-                        Color.clear.preference(key: BoardRectKey.self, value: geo.frame(in: .named("gameCanvas")))
-                    }
-                }
                 .padding(.top, 0)
                 .padding(.bottom, boardGutter)
             footer
@@ -176,9 +164,11 @@ struct GameView: View {
                     .shadow(color: textHalo, radius: 8)
             }
             .buttonStyle(.plain)
+            .animation(.easeInOut(duration: 0.22), value: sakuraLook)
             Spacer(minLength: 8)
             lookMenu
                 .shadow(color: textHalo, radius: 8)
+                .animation(.easeInOut(duration: 0.22), value: sakuraLook)
         }
         .zIndex(1)
         .padding(.horizontal, 20)
@@ -200,8 +190,8 @@ struct GameView: View {
                     .frame(width: 22, height: 22)
                 Text(turnTitle)
                     .font(bannerFont)
-                    .foregroundStyle(Theme.ink(dark: true))
-                    .modifier(OverlayReadable(enabled: true))
+                    .foregroundStyle(overlayCopy)
+                    .modifier(OverlayReadable(onLight: sakuraLook == .color))
                 Spacer(minLength: 8)
             }
             HStack(alignment: .center, spacing: 8) {
@@ -236,11 +226,12 @@ struct GameView: View {
     private var footerHint: some View {
         Text(boardStatusText ?? " ")
             .font(.system(size: overlayTypeSize, weight: .regular, design: .serif))
-            .foregroundStyle(Theme.ink(dark: true))
+            .foregroundStyle(overlayCopy)
             .multilineTextAlignment(.leading)
             .lineLimit(3)
             .minimumScaleFactor(0.8)
-            .modifier(OverlayReadable(enabled: true))
+            .modifier(OverlayReadable(onLight: sakuraLook == .color))
+            .animation(.easeInOut(duration: 0.22), value: sakuraLook)
             .opacity(boardStatusText == nil ? 0 : 1)
             .frame(maxWidth: .infinity, minHeight: footerSlotHeight, maxHeight: footerSlotHeight, alignment: .bottomLeading)
     }
@@ -272,7 +263,7 @@ struct GameView: View {
         return ZStack(alignment: .bottom) {
             ForEach(0..<count, id: \.self) { index in
                 SealMark(
-                    color: Theme.seal(player, palette: activeSeals, skin: .sakura),
+                    color: Theme.seal(player, palette: activeSeals),
                     motif: reserveMotif(player),
                     outline: stackEdge(for: player),
                     outlineWidth: 1.2 * sealScale
@@ -326,36 +317,8 @@ struct GameView: View {
         return nil
     }
 
-    private var tableSpinGesture: some Gesture {
-        DragGesture(minimumDistance: 10, coordinateSpace: .named("gameCanvas"))
-            .onChanged { value in
-                guard boardRect.width > 8, !boardRect.contains(value.startLocation) else { return }
-                guard let view = scene.scnView else { return }
-                let point = CGPoint(
-                    x: value.location.x - boardRect.minX,
-                    y: value.location.y - boardRect.minY
-                )
-                if tableSpinActive {
-                    scene.updateTablePan(at: point, in: view)
-                } else {
-                    tableSpinActive = true
-                    scene.beginTablePan(at: point, in: view)
-                }
-            }
-            .onEnded { _ in
-                finishTableSpin()
-            }
-    }
-
-    private func finishTableSpin() {
-        guard tableSpinActive else { return }
-        tableSpinActive = false
-        scene.endTablePan()
-    }
-
     private var perspectiveChip: some View {
         Button {
-            finishTableSpin()
             is3DView.toggle()
             scene.setPerspective3D(is3DView)
             HapticsService.select(enabled: settings.hapticsEnabled)
@@ -421,7 +384,7 @@ struct GameView: View {
         lookChip(t(sakuraLook == .mono ? "sakura_look_mono" : "sakura_look_color")) {
             sakuraLook.cycle()
             applyBoardLook()
-            scene.syncBoard(game.model, winningLine: nil)
+            scene.syncBoard(game.model, winningLine: nil, force: true)
         }
     }
 
@@ -445,17 +408,23 @@ struct GameView: View {
         .buttonStyle(.plain)
     }
 
-    private var isDark: Bool { true }
     private var resultScheme: ColorScheme { sakuraLook == .color ? .light : .dark }
     private var activeSeals: SealPalette { sakuraLook == .mono ? .mono : .classic }
     private var ink: Color { Color(white: 0.96) }
-    private var boardInk: Color { Color(white: 0.96) }
+    private var boardInk: Color { ink }
     private var textHalo: Color { Color.black.opacity(0.55) }
     private var overlayHalo: Color { Color.black.opacity(0.55) }
+    private var overlayCopy: Color {
+        sakuraLook == .color ? Theme.waxDusk : Theme.ink(dark: true)
+    }
     private var lookChipFill: Color { Theme.waxWhite }
     private var lookChipInk: Color { Theme.ink }
-    private var hudChromeFill: Color { Theme.waxBlack }
-    private var hudChromeInk: Color { Theme.cream }
+    private var hudChromeFill: Color {
+        sakuraLook == .color ? Theme.waxDusk : Theme.waxBlack
+    }
+    private var hudChromeInk: Color {
+        sakuraLook == .color ? Theme.cream : Theme.cream
+    }
     private var bannerFont: Font { .system(.body, design: .serif).weight(.medium) }
     private var hudMeterFont: Font { .system(.title2, design: .serif).weight(.medium) }
     private var turnTimerColor: Color {
@@ -464,7 +433,7 @@ struct GameView: View {
     }
 
     private var currentColor: Color {
-        Theme.seal(game.currentPlayer, palette: activeSeals, skin: .sakura)
+        Theme.seal(game.currentPlayer, palette: activeSeals)
     }
 
     private var onSeal: Color {
@@ -483,11 +452,8 @@ struct GameView: View {
 
     private var sealOutline: Color? {
         guard activeSeals == .mono else { return nil }
-        if isDark, game.currentPlayer == .red {
+        if game.currentPlayer == .red {
             return ink.opacity(0.7)
-        }
-        if !isDark, game.currentPlayer == .indigo {
-            return ink.opacity(0.4)
         }
         return nil
     }
@@ -539,7 +505,7 @@ struct GameView: View {
             .foregroundStyle(active ? onSeal : ink.opacity(0.55))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(active ? currentColor : ink.opacity(isDark ? 0.16 : 0.08), in: Capsule())
+            .background(active ? currentColor : ink.opacity(0.16), in: Capsule())
     }
 
     private var isAIThinking: Bool {
@@ -555,8 +521,6 @@ struct GameView: View {
     private var isHumanTurn: Bool {
         guard game.status == .playing else { return false }
         switch game.mode {
-        case .local:
-            return true
         case .ai:
             return game.currentPlayer == .red
         case .gameCenter:
@@ -610,7 +574,6 @@ struct GameView: View {
         guard canAct, game.phase == .place else { return }
         let player = game.currentPlayer
         guard game.place(at: position) else { return }
-        WaxlinePerf.event("place.tap", "")
         scene.dropSeal(at: position, player: player)
         HapticsService.place(enabled: settings.hapticsEnabled)
         SoundService.place(enabled: settings.soundEnabled)
@@ -656,16 +619,7 @@ struct GameView: View {
     }
 
     private func applyBoardLook() {
-        scene.applyLook(
-            dark: true,
-            seals: activeSeals,
-            table: settings.tableFinish,
-            tablet: settings.tabletFinish,
-            clearCanvas: true,
-            skin: .sakura,
-            sakuraTablet: sakuraTablet,
-            showTable: false
-        )
+        scene.applyLook(seals: activeSeals, tablet: sakuraTablet)
     }
 
     private func highlightWin() {
@@ -818,16 +772,19 @@ struct GameView: View {
 }
 
 private struct OverlayReadable: ViewModifier {
-    var enabled: Bool
+    var onLight: Bool
 
     func body(content: Content) -> some View {
-        if enabled {
+        if onLight {
+            content
+                .shadow(color: Color.white.opacity(0.85), radius: 0, y: 1)
+                .shadow(color: Color.white.opacity(0.55), radius: 3)
+                .shadow(color: Theme.cream.opacity(0.4), radius: 8)
+        } else {
             content
                 .shadow(color: .black.opacity(0.95), radius: 0, y: 1)
                 .shadow(color: .black.opacity(0.8), radius: 3)
                 .shadow(color: .black.opacity(0.45), radius: 8)
-        } else {
-            content
         }
     }
 }
@@ -873,13 +830,5 @@ private struct CornerBrackets: Shape {
         path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - length))
 
         return path
-    }
-}
-
-private struct BoardRectKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
     }
 }

@@ -50,14 +50,8 @@ enum GameStatus: Sendable, Equatable {
 }
 
 enum GameMode: Equatable, Hashable {
-    case local
     case ai(AILevel)
     case gameCenter
-}
-
-enum GameSkin: Equatable {
-    case classic
-    case sakura
 }
 
 enum SakuraLook: String, Sendable, CaseIterable {
@@ -92,43 +86,6 @@ enum LanguageOverride: String, Sendable, Codable, CaseIterable, Identifiable {
 enum SealPalette: String, Sendable, Codable, CaseIterable {
     case classic
     case mono
-}
-
-enum TableFinish: String, Sendable, Codable, CaseIterable {
-    case walnut
-    case ebony
-    case oak
-}
-
-enum TabletFinish: String, Sendable, Codable, CaseIterable {
-    case granite
-    case slate
-    case sand
-}
-
-enum SakuraTableTheme: String, Sendable, CaseIterable {
-    case oak
-    case honey
-    case plank
-    case cedar
-
-    var colorResource: String {
-        switch self {
-        case .oak: "sakura_table_color"
-        case .honey: "sakura_table_honey_color"
-        case .plank: "sakura_table_plank_color"
-        case .cedar: "sakura_table_cedar_color"
-        }
-    }
-
-    var roughResource: String {
-        switch self {
-        case .oak: "sakura_table_rough"
-        case .honey: "sakura_table_honey_rough"
-        case .plank: "sakura_table_plank_rough"
-        case .cedar: "sakura_table_cedar_rough"
-        }
-    }
 }
 
 enum SakuraTabletTheme: String, Sendable {

@@ -20,7 +20,7 @@ final class GameState {
 
     var localHumanPlayer: Player? {
         switch mode {
-        case .local, .gameCenter: nil
+        case .gameCenter: nil
         case .ai: .red
         }
     }

@@ -197,11 +197,12 @@ struct OnboardingView: View {
             .rotationEffect(.degrees(rotated ? 14 : 0))
     }
 
-    private var charcoalImage: Image {
-        if let url = Bundle.main.url(forResource: "sakura_tablet_charcoal_color", withExtension: "jpg"),
-           let image = UIImage(contentsOfFile: url.path) {
+    private static let charcoalImage: Image = {
+        if let image = PaperStyle.bundleImage("sakura_tablet_charcoal_color") {
             return Image(uiImage: image)
         }
         return Image(systemName: "square.fill")
-    }
+    }()
+
+    private var charcoalImage: Image { Self.charcoalImage }
 }
