@@ -29,6 +29,12 @@ enum Theme {
     }
 }
 
+extension SakuraLook {
+    var colorScheme: ColorScheme {
+        self == .color ? .light : .dark
+    }
+}
+
 struct RootView: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(GameCenterService.self) private var gameCenter
@@ -68,13 +74,15 @@ struct RootView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
+                .preferredColorScheme(settings.sakuraLook.colorScheme)
         }
-        .fullScreenCover(isPresented: $showOnboarding) {
+        .sheet(isPresented: $showOnboarding) {
             OnboardingView {
                 settings.hasCompletedOnboarding = true
                 showOnboarding = false
                 authenticateIfNeeded()
             }
+            .preferredColorScheme(settings.sakuraLook.colorScheme)
         }
         .fullScreenCover(isPresented: $gameCenter.matchmakerPresented) {
             TurnBasedMatchmakerView(

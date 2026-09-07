@@ -11,7 +11,6 @@ struct GameView: View {
     @State private var busy = false
     @State private var showResult = false
     @State private var is3DView = false
-    @State private var showLookPanel = false
     private var sakuraLook: SakuraLook {
         get { settings.sakuraLook }
         nonmutating set { settings.sakuraLook = newValue }
@@ -102,8 +101,8 @@ struct GameView: View {
         }
         .sheet(isPresented: $showResult) {
             ResultSheet(game: game, seals: activeSeals, onAgain: replay, onMenu: onExit)
-                .environment(\.colorScheme, resultScheme)
-                .preferredColorScheme(resultScheme)
+                .environment(\.colorScheme, sakuraLook.colorScheme)
+                .preferredColorScheme(sakuraLook.colorScheme)
         }
         .onDisappear {
             resultTask?.cancel()
@@ -135,17 +134,6 @@ struct GameView: View {
                         .padding(1)
                         .allowsHitTesting(false)
                 }
-                .overlay {
-                    if showLookPanel {
-                        Color.clear
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                withAnimation(.easeOut(duration: 0.25)) {
-                                    showLookPanel = false
-                                }
-                            }
-                    }
-                }
                 .padding(.top, 0)
                 .padding(.bottom, boardGutter)
             footer
@@ -169,7 +157,7 @@ struct GameView: View {
             .buttonStyle(.plain)
             .animation(.easeInOut(duration: 0.22), value: sakuraLook)
             Spacer(minLength: 8)
-            lookMenu
+            lookToggle
                 .shadow(color: textHalo, radius: 8)
                 .animation(.easeInOut(duration: 0.22), value: sakuraLook)
         }
@@ -177,13 +165,6 @@ struct GameView: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 0)
-        .background {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if showLookPanel { showLookPanel = false }
-                }
-        }
     }
 
     private var turnBanner: some View {
@@ -342,100 +323,36 @@ struct GameView: View {
         .accessibilityLabel(is3DView ? t("view_3d") : t("view_2d"))
     }
 
-    private var lookMenu: some View {
+    private var lookToggle: some View {
         Button {
-            withAnimation(.easeOut(duration: 0.25)) {
-                showLookPanel.toggle()
-            }
-            HapticsService.select(enabled: settings.hapticsEnabled)
-        } label: {
-            Image(systemName: showLookPanel ? "gearshape.fill" : "gearshape")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(hudChromeInk)
-                .frame(width: 32, height: 32)
-                .background(hudChromeFill, in: Circle())
-                .overlay {
-                    Circle().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
-                }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(t("look_settings"))
-        .overlay(alignment: .topTrailing) {
-            VStack(alignment: .trailing, spacing: 6) {
-                Color.clear
-                    .frame(width: 32, height: 32)
-                    .allowsHitTesting(false)
-                ZStack(alignment: .topTrailing) {
-                    if showLookPanel {
-                        VStack(alignment: .trailing, spacing: 6) {
-                            lookPanelChips
-                        }
-                        .fixedSize()
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                }
-                .frame(width: 108, height: lookPanelClipHeight, alignment: .topTrailing)
-                .clipped()
-                .allowsHitTesting(showLookPanel)
-            }
-        }
-        .animation(.easeOut(duration: 0.25), value: showLookPanel)
-    }
-
-    private var lookSwitchTrack: Color {
-        sakuraLook == .color ? Theme.cream.opacity(0.94) : Theme.waxBlack.opacity(0.28)
-    }
-    private var lookSwitchStroke: Color {
-        sakuraLook == .color ? Theme.waxCinnabar.opacity(0.32) : Theme.cream.opacity(0.28)
-    }
-    private var lookPanelClipHeight: CGFloat { 38 }
-
-    private var lookPanelChips: some View {
-        lookSwitch
-    }
-
-    private var lookSwitch: some View {
-        HStack(spacing: 2) {
-            lookFace(.mono)
-            lookFace(.color)
-        }
-        .padding(2)
-        .background(lookSwitchTrack, in: Capsule())
-        .overlay {
-            Capsule().stroke(lookSwitchStroke, lineWidth: 1)
-        }
-        .animation(.easeInOut(duration: 0.22), value: sakuraLook)
-        .accessibilityElement(children: .contain)
-    }
-
-    private func lookFace(_ look: SakuraLook) -> some View {
-        let selected = sakuraLook == look
-        let colors: [Color] = look == .mono
-            ? [Theme.waxBlack, Theme.waxWhite]
-            : [Theme.waxCinnabar, Theme.waxDusk]
-        return Button {
-            guard sakuraLook != look else { return }
-            sakuraLook = look
+            sakuraLook.cycle()
             applyBoardLook()
             scene.syncBoard(game.model, winningLine: nil, force: true)
             HapticsService.select(enabled: settings.hapticsEnabled)
         } label: {
-            Capsule()
-                .fill(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing))
-                .frame(width: 22, height: 9)
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: sakuraLook == .mono
+                            ? [.black, .white]
+                            : [Theme.waxCinnabar, Theme.waxDusk],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 32, height: 32)
                 .overlay {
-                    Capsule().stroke(Theme.ink.opacity(look == .mono ? 0.22 : 0), lineWidth: 0.6)
+                    Circle().stroke(
+                        sakuraLook == .color ? hudChromeFill : hudChromeInk.opacity(0.35),
+                        lineWidth: 1
+                    )
                 }
-                .frame(width: 46, height: 28)
-                .background(selected ? Theme.waxWhite : Color.clear, in: Capsule())
-                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(t(look == .mono ? "sakura_look_mono" : "sakura_look_color"))
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityLabel(t("look_settings"))
+        .accessibilityValue(t(sakuraLook == .mono ? "sakura_look_mono" : "sakura_look_color"))
     }
 
-    private var resultScheme: ColorScheme { sakuraLook == .color ? .light : .dark }
     private var activeSeals: SealPalette { sakuraLook == .mono ? .mono : .classic }
     private var ink: Color { Color(white: 0.96) }
     private var boardInk: Color { ink }
@@ -729,7 +646,7 @@ struct GameView: View {
                     return
                 }
                 guard !Task.isCancelled else { return }
-                if busy || showLookPanel { continue }
+                if busy { continue }
                 guard isHumanTurn, game.status == .playing else { return }
                 if turnSecondsLeft <= 1 {
                     turnSecondsLeft = 0

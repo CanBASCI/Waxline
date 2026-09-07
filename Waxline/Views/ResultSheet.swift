@@ -40,7 +40,8 @@ struct ResultSheet: View {
         .presentationDetents([.height(248)])
         .presentationDragIndicator(.hidden)
         .interactiveDismissDisabled()
-        .preferredColorScheme(sheetScheme)
+        .presentationBackground(.background)
+        .preferredColorScheme(settings.sakuraLook.colorScheme)
     }
 
     private func resultAction(_ title: String, prominent: Bool, action: @escaping () -> Void) -> some View {
@@ -58,9 +59,7 @@ struct ResultSheet: View {
         .buttonStyle(.plain)
     }
 
-    private var sheetDark: Bool { seals == .mono }
-
-    private var sheetScheme: ColorScheme { sheetDark ? .dark : .light }
+    private var sheetDark: Bool { settings.sakuraLook == .mono }
 
     private var prominentFill: Color {
         sheetDark ? Color.white.opacity(0.16) : Theme.waxRed

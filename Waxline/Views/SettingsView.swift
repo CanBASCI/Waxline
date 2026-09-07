@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(SettingsStore.self) private var settings
-    @Environment(\.dismiss) private var dismiss
 
     private func t(_ key: String.LocalizationValue) -> String {
         L10n.text(key, language: settings.language)
@@ -32,16 +31,12 @@ struct SettingsView: View {
                     }
                 }
             }
-            .scrollContentBackground(.hidden)
             .navigationTitle(t("settings_title"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(t("done")) { dismiss() }
-                }
-            }
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
+        .presentationBackground(.background)
+        .preferredColorScheme(settings.sakuraLook.colorScheme)
     }
 }

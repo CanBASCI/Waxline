@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct OnboardingView: View {
     var onDone: () -> Void
@@ -13,29 +12,9 @@ struct OnboardingView: View {
     }
 
     var body: some View {
-        ZStack {
-            GameLoopBackdrop(resource: "gamescreensakuravideo_2", ext: "mov")
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.28),
-                    Color.black.opacity(0.12),
-                    Color.black.opacity(0.55)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-
+        NavigationStack {
             VStack(spacing: 0) {
-                HStack {
-                    Spacer()
-                    chromeButton(t("onboarding_skip"), action: onDone)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-
-                Spacer(minLength: 12)
+                Spacer(minLength: 4)
 
                 pageBody
                     .id(page)
@@ -45,49 +24,47 @@ struct OnboardingView: View {
                     ))
                     .highPriorityGesture(pageSwipe)
 
-                Spacer(minLength: 12)
+                Spacer(minLength: 4)
 
                 HStack(spacing: 8) {
                     ForEach(0..<pageCount, id: \.self) { index in
                         Capsule()
-                            .fill(index == page ? Theme.cream : Color.white.opacity(0.28))
+                            .fill(index == page ? Color.accentColor : Color.secondary.opacity(0.28))
                             .frame(width: index == page ? 22 : 8, height: 8)
                     }
                 }
-                .padding(.bottom, 18)
+                .padding(.bottom, 14)
 
                 Button(action: advance) {
                     Text(page == pageCount - 1 ? t("onboarding_done") : t("onboarding_next"))
                         .font(.system(.body, design: .serif).weight(.semibold))
-                        .foregroundStyle(Theme.cream)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Theme.waxBlack, in: Capsule())
-                        .overlay {
-                            Capsule().stroke(Theme.cream.opacity(0.35), lineWidth: 1)
-                        }
+                        .padding(.vertical, 10)
                 }
-                .buttonStyle(.plain)
-                .contentShape(Capsule())
+                .buttonStyle(.borderedProminent)
+                .clipShape(Capsule())
                 .padding(.horizontal, 28)
-                .padding(.bottom, 32)
+                .padding(.bottom, 16)
             }
-            .allowsHitTesting(true)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .navigationTitle(t("menu_how_to_play"))
+            .navigationBarTitleDisplayMode(.inline)
         }
-        .preferredColorScheme(.dark)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(.background)
+        .preferredColorScheme(settings.sakuraLook.colorScheme)
         .animation(.easeOut(duration: 0.28), value: page)
     }
 
     private var pageBody: some View {
-        VStack(spacing: 28) {
+        VStack(spacing: 18) {
             pageArt(page)
             Text(t(copy(for: page)))
-                .font(.system(.title2, design: .serif).weight(.medium))
-                .foregroundStyle(Theme.ink(dark: true))
+                .font(.system(.title3, design: .serif).weight(.medium))
+                .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
-                .shadow(color: .black.opacity(0.95), radius: 0, y: 1)
-                .shadow(color: .black.opacity(0.8), radius: 3)
-                .shadow(color: .black.opacity(0.45), radius: 8)
                 .padding(.horizontal, 32)
         }
         .frame(maxWidth: .infinity)
@@ -113,22 +90,6 @@ struct OnboardingView: View {
         page += 1
     }
 
-    private func chromeButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(.body, design: .serif).weight(.medium))
-                .foregroundStyle(Theme.cream)
-                .padding(.horizontal, 12)
-                .frame(height: 32)
-                .background(Theme.waxBlack, in: Capsule())
-                .overlay {
-                    Capsule().stroke(Theme.cream.opacity(0.35), lineWidth: 1)
-                }
-        }
-        .buttonStyle(.plain)
-        .contentShape(Capsule())
-    }
-
     private func copy(for index: Int) -> String.LocalizationValue {
         switch index {
         case 0: "onboarding_place"
@@ -145,7 +106,7 @@ struct OnboardingView: View {
             SealMark(
                 color: Theme.waxBlack,
                 motif: Theme.gold,
-                outline: Theme.cream.opacity(0.45),
+                outline: Theme.ink.opacity(0.2),
                 outlineWidth: 1.2
             )
             .frame(width: 72, height: 72)
@@ -159,7 +120,7 @@ struct OnboardingView: View {
                     SealMark(
                         color: Theme.waxBlack,
                         motif: Theme.gold,
-                        outline: Theme.cream.opacity(0.4),
+                        outline: Theme.ink.opacity(0.18),
                         outlineWidth: 1
                     )
                     .frame(width: 28, height: 28)
@@ -191,9 +152,9 @@ struct OnboardingView: View {
             .frame(width: side, height: side)
             .clipShape(shape)
             .overlay {
-                shape.stroke(Theme.cream.opacity(rotated ? 0.55 : 0.18), lineWidth: rotated ? 1.2 : 0.8)
+                shape.stroke(Theme.ink.opacity(rotated ? 0.35 : 0.12), lineWidth: rotated ? 1.2 : 0.8)
             }
-            .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
+            .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
             .rotationEffect(.degrees(rotated ? 14 : 0))
     }
 

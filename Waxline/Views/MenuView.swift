@@ -15,6 +15,7 @@ struct MenuView: View {
     }
 
     private var menuFont: Font { .system(.body, design: .serif).weight(.medium) }
+    private var menuLinkFont: Font { .system(size: 18, weight: .medium, design: .serif) }
     @State private var idle = false
 
     var body: some View {
@@ -52,7 +53,7 @@ struct MenuView: View {
                     textLink(t("menu_how_to_play"), index: 2, action: onHowToPlay)
                     textLink(t("menu_settings"), index: 3, action: onSettings)
                 }
-                .font(menuFont)
+                .font(menuLinkFont)
                 .foregroundStyle(Theme.ink)
                 .shadow(color: Color.white.opacity(0.75), radius: 8)
                 .allowsHitTesting(playback.didFinish)
