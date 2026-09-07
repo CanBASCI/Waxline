@@ -28,9 +28,7 @@ struct ResultSheet: View {
                 .multilineTextAlignment(.center)
 
             VStack(spacing: 10) {
-                if game.mode != .gameCenter {
-                    resultAction(t("play_again"), prominent: true, action: onAgain)
-                }
+                resultAction(t("play_again"), prominent: true, action: onAgain)
                 resultAction(t("menu"), prominent: false, action: onMenu)
             }
         }
@@ -119,7 +117,9 @@ struct ResultSheet: View {
     }
 
     private var badgeMotif: Color {
-        isWhiteWin ? Theme.waxBlack : Theme.gold
+        if isWhiteWin { return Theme.waxBlack }
+        if case .draw = game.status { return Theme.waxBlack }
+        return Theme.gold
     }
 
     private var badgeOutline: Color? {

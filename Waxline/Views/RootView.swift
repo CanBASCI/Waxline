@@ -39,6 +39,7 @@ struct RootView: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(GameCenterService.self) private var gameCenter
     @State private var game: GameState?
+    @State private var sessionSeries = MatchSeries()
     @State private var showSettings = false
     @State private var showOnboarding = false
     @State private var menuIntro = MenuIntroPlayback()
@@ -51,7 +52,15 @@ struct RootView: View {
             && !gameCenter.matchmakerPresented
         ZStack {
             if let game {
-                GameView(game: game, onExit: { self.game = nil })
+                GameView(
+                    game: game,
+                    onExit: {
+                        sessionSeries = MatchSeries()
+                        self.game = nil
+                    },
+                    onPreserveSeries: { sessionSeries = game.series }
+                )
+                .id(gameCenter.activeMatch?.matchID ?? "local")
             } else {
                 MenuView(
                     playback: menuIntro,
@@ -128,6 +137,10 @@ struct RootView: View {
     private func openGameCenter(_ match: GKTurnBasedMatch) {
         menuIntro.setMenuVisible(false)
         gameCenter.attach(match: match)
-        game = GameState(mode: .gameCenter, model: gameCenter.model(from: match))
+        game = GameState(
+            mode: .gameCenter,
+            model: gameCenter.model(from: match),
+            series: sessionSeries
+        )
     }
 }

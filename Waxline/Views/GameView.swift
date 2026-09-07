@@ -3,6 +3,7 @@ import SwiftUI
 struct GameView: View {
     @Bindable var game: GameState
     var onExit: () -> Void
+    var onPreserveSeries: () -> Void = {}
 
     @Environment(SettingsStore.self) private var settings
     @Environment(GameCenterService.self) private var gameCenter
@@ -81,7 +82,10 @@ struct GameView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear { configureScene() }
-        .onChange(of: game.status) { _, newStatus in
+        .onChange(of: game.status) { oldStatus, newStatus in
+            if oldStatus == .playing, newStatus != .playing {
+                game.recordSeriesResult(you: seriesYou)
+            }
             if newStatus != .playing {
                 stopTurnTimer()
                 scene.abandonTabletDrag()
@@ -207,16 +211,42 @@ struct GameView: View {
         .accessibilityLabel(boardStatusText ?? t("seal_reserve"))
     }
 
+    private var seriesMaxWidth: CGFloat {
+        max(96, canvasSize.width / 2 - 20)
+    }
+
+    private var seriesSealSize: CGFloat {
+        let hintBlock = overlayTypeSize * 1.4 + 8
+        let heightBudget = min(footerSlotHeight * 0.42, max(26, footerSlotHeight - hintBlock))
+        let widthFactor: CGFloat = game.series.draws > 0 ? 7.8 : 5.2
+        return min(heightBudget, seriesMaxWidth / widthFactor)
+    }
+
     private var footerHint: some View {
-        Text(boardStatusText ?? " ")
-            .font(.system(size: overlayTypeSize, weight: .regular, design: .serif))
-            .foregroundStyle(overlayCopy)
-            .multilineTextAlignment(.leading)
-            .lineLimit(3)
-            .minimumScaleFactor(0.8)
-            .modifier(OverlayReadable())
-            .opacity(boardStatusText == nil ? 0 : 1)
-            .frame(maxWidth: .infinity, minHeight: footerSlotHeight, maxHeight: footerSlotHeight, alignment: .bottomLeading)
+        VStack(alignment: .leading, spacing: 8) {
+            if game.series.hasHands {
+                SeriesScoreRow(
+                    series: game.series,
+                    seals: activeSeals,
+                    you: seriesYou,
+                    sealSize: seriesSealSize,
+                    numberColor: overlayCopy
+                )
+                .fixedSize(horizontal: true, vertical: true)
+                .frame(maxWidth: seriesMaxWidth, alignment: .leading)
+                .modifier(OverlayReadable())
+            }
+            Spacer(minLength: 0)
+            Text(boardStatusText ?? " ")
+                .font(.system(size: overlayTypeSize, weight: .regular, design: .serif))
+                .foregroundStyle(overlayCopy)
+                .multilineTextAlignment(.leading)
+                .lineLimit(3)
+                .minimumScaleFactor(0.8)
+                .modifier(OverlayReadable())
+                .opacity(boardStatusText == nil ? 0 : 1)
+        }
+        .frame(maxWidth: .infinity, minHeight: footerSlotHeight, maxHeight: footerSlotHeight, alignment: .topLeading)
     }
 
     private var sealReserve: some View {
@@ -333,9 +363,17 @@ struct GameView: View {
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: sakuraLook == .mono
-                            ? [.black, .white]
-                            : [Theme.waxCinnabar, Theme.waxDusk],
+                        stops: sakuraLook == .mono
+                            ? [
+                                .init(color: .black, location: 0),
+                                .init(color: .black, location: 0.16),
+                                .init(color: .white, location: 0.84),
+                                .init(color: .white, location: 1)
+                            ]
+                            : [
+                                .init(color: Theme.waxCinnabar, location: 0),
+                                .init(color: Theme.waxDusk, location: 1)
+                            ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -488,10 +526,18 @@ struct GameView: View {
         }
         scene.resetTabletOrientation()
         applyBoardLook()
-        scene.syncBoard(game.model, winningLine: nil)
+        scene.syncBoard(game.model, winningLine: {
+            if case .won(_, let line) = game.status { return line }
+            return nil
+        }())
         scene.setPerspective3D(is3DView)
         refreshInteraction()
-        if shouldStartAI {
+        if game.isFinished {
+            if !game.series.hasHands {
+                game.recordSeriesResult(you: seriesYou)
+            }
+            showResult = true
+        } else if shouldStartAI {
             Task { await playAI() }
         } else {
             beginNextTurnClock()
@@ -568,7 +614,19 @@ struct GameView: View {
         }
     }
 
+    private var seriesYou: Player {
+        if game.mode == .gameCenter, let match = gameCenter.activeMatch {
+            return gameCenter.localPlayerColor(in: match)
+        }
+        return .red
+    }
+
     private func replay() {
+        if game.mode == .gameCenter {
+            onPreserveSeries()
+            gameCenter.presentMatchmaker()
+            return
+        }
         showResult = false
         game.reset()
         selectedQuadrant = nil

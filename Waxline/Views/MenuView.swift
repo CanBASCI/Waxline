@@ -172,6 +172,70 @@ struct SealMark: View {
     }
 }
 
+struct SeriesScoreRow: View {
+    var series: MatchSeries
+    var seals: SealPalette
+    var you: Player = .red
+    var sealSize: CGFloat
+    var numberColor: Color
+
+    var body: some View {
+        HStack(spacing: sealSize * 0.45) {
+            scoreMark(you, count: series.you)
+            Text("–")
+                .foregroundStyle(numberColor.opacity(0.5))
+            scoreMark(you.opponent, count: series.opponent)
+            if series.draws > 0 {
+                scoreMark(nil, count: series.draws)
+            }
+        }
+        .font(.system(size: sealSize * 0.62, weight: .medium, design: .serif))
+        .monospacedDigit()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        if series.draws > 0 {
+            return "\(series.you)–\(series.opponent)–\(series.draws)"
+        }
+        return "\(series.you)–\(series.opponent)"
+    }
+
+    private func scoreMark(_ player: Player?, count: Int) -> some View {
+        HStack(spacing: sealSize * 0.28) {
+            SealMark(
+                color: player.map { Theme.seal($0, palette: seals) } ?? Theme.gold,
+                motif: motif(for: player),
+                outline: outline(for: player)
+            )
+            .frame(width: sealSize, height: sealSize)
+            Text("\(count)")
+                .foregroundStyle(numberColor)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: true)
+                .frame(height: sealSize)
+        }
+    }
+
+    private func motif(for player: Player?) -> Color {
+        if player == nil { return Theme.waxBlack }
+        if seals == .mono, player == .indigo { return Theme.waxBlack }
+        return Theme.gold
+    }
+
+    private func outline(for player: Player?) -> Color? {
+        guard seals == .mono else { return nil }
+        if player == .indigo {
+            return Theme.ink.opacity(0.4)
+        }
+        if player == .red {
+            return Theme.ink(dark: true).opacity(0.7)
+        }
+        return Theme.ink.opacity(0.35)
+    }
+}
+
 struct SealStar: Shape {
     func path(in rect: CGRect) -> Path {
         let center = CGPoint(x: rect.midX, y: rect.midY)

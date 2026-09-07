@@ -54,6 +54,14 @@ enum GameMode: Equatable, Hashable {
     case gameCenter
 }
 
+struct MatchSeries: Equatable, Sendable {
+    var you = 0
+    var opponent = 0
+    var draws = 0
+
+    var hasHands: Bool { you + opponent + draws > 0 }
+}
+
 enum SakuraLook: String, Sendable, CaseIterable {
     case color
     case mono
