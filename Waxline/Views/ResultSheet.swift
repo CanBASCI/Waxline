@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ResultSheet: View {
     var game: GameState
-    var skin: GameSkin = .classic
     var seals: SealPalette = .classic
     var onAgain: () -> Void
     var onMenu: () -> Void
@@ -59,10 +58,7 @@ struct ResultSheet: View {
         .buttonStyle(.plain)
     }
 
-    private var sheetDark: Bool {
-        if skin == .sakura { return seals == .mono }
-        return settings.boardDark
-    }
+    private var sheetDark: Bool { seals == .mono }
 
     private var sheetScheme: ColorScheme { sheetDark ? .dark : .light }
 
@@ -110,7 +106,7 @@ struct ResultSheet: View {
     private var badgeColor: Color {
         switch game.status {
         case .won(let player, _):
-            Theme.seal(player, palette: seals, skin: skin)
+            Theme.seal(player, palette: seals, skin: .sakura)
         default:
             Theme.gold
         }

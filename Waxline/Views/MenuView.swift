@@ -5,12 +5,10 @@ struct MenuView: View {
     @Environment(GameCenterService.self) private var gameCenter
 
     var playback: MenuIntroPlayback
-    var onLocal: () -> Void
     var onAI: () -> Void
     var onGameCenter: () -> Void
     var onSettings: () -> Void
     var onHowToPlay: () -> Void
-    var onTest: () -> Void
 
     private func t(_ key: String.LocalizationValue) -> String {
         L10n.text(key, language: settings.language)
@@ -36,12 +34,10 @@ struct MenuView: View {
                 .opacity(playback.isReady ? 1 : 0)
 
                 VStack(alignment: .trailing, spacing: 14) {
-                    textLink(t("menu_local"), index: 0, action: onLocal)
-                    textLink(t("menu_ai"), index: 1, action: onAI)
-                    textLink(t("menu_gamecenter"), index: 2, action: onGameCenter)
-                    textLink(t("menu_how_to_play"), index: 3, action: onHowToPlay)
-                    textLink(t("menu_settings"), index: 4, action: onSettings)
-                    textLink(t("menu_test"), index: 5, action: onTest)
+                    textLink(t("menu_ai"), index: 0, action: onAI)
+                    textLink(t("menu_gamecenter"), index: 1, action: onGameCenter)
+                    textLink(t("menu_how_to_play"), index: 2, action: onHowToPlay)
+                    textLink(t("menu_settings"), index: 3, action: onSettings)
                 }
                 .font(menuFont)
                 .foregroundStyle(Theme.ink)
@@ -67,7 +63,7 @@ struct MenuView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
         .safeAreaInset(edge: .top, alignment: .trailing, spacing: 0) {
-            if playback.isReady, !playback.didFinish, playback.handoff < 0.2 {
+            if playback.isReady, !playback.didFinish {
                 Button(action: playback.skip) {
                     Text(t("onboarding_skip"))
                         .font(menuFont)

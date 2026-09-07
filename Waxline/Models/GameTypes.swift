@@ -131,50 +131,15 @@ enum SakuraTableTheme: String, Sendable, CaseIterable {
     }
 }
 
-enum SakuraTabletTheme: String, Sendable, CaseIterable {
-    case grey
-    case white
-    case taupe
+enum SakuraTabletTheme: String, Sendable {
     case charcoal
-    case paper
-    case glass
+    case blossom
 
-    var colorResource: String? {
+    var colorResource: String {
         switch self {
-        case .grey: "sakura_tablet_color"
-        case .white: "sakura_tablet_white_color"
-        case .taupe: "sakura_tablet_taupe_color"
         case .charcoal: "sakura_tablet_charcoal_color"
-        case .paper: "sakura_tablet_paper_color"
-        case .glass: nil
+        case .blossom: "sakura_tablet_blossom_color"
         }
-    }
-
-    var roughResource: String? {
-        switch self {
-        case .grey: "sakura_tablet_rough"
-        case .white: "sakura_tablet_white_rough"
-        case .taupe: "sakura_tablet_taupe_rough"
-        case .charcoal: "sakura_tablet_charcoal_rough"
-        case .paper: "sakura_tablet_paper_rough"
-        case .glass: nil
-        }
-    }
-}
-
-struct LastMove: Sendable, Equatable, Identifiable {
-    let id: UUID
-    var player: Player
-    var position: Position
-    var quadrant: Quadrant?
-    var clockwise: Bool?
-
-    init(player: Player, position: Position, quadrant: Quadrant?, clockwise: Bool?) {
-        self.id = UUID()
-        self.player = player
-        self.position = position
-        self.quadrant = quadrant
-        self.clockwise = clockwise
     }
 }
 

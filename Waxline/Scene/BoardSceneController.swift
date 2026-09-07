@@ -22,8 +22,6 @@ final class BoardSceneController: NSObject {
     private var cellNodes: [String: SCNNode] = [:]
     private var sealNodes: [String: SCNNode] = [:]
     private var sealTemplates: [String: SCNNode] = [:]
-    private var sealCoordLabelsHidden = false
-    private var sealCoordNames: [String: String] = [:]
 
     private var allowsCellTaps = true
     private var allowsQuadrantTaps = false
@@ -187,7 +185,7 @@ final class BoardSceneController: NSObject {
             for row in 0..<6 {
                 for col in 0..<6 {
                     let key = visualCellKey(row: row, col: col)
-                    updateSeal(key: key, cell: model.cells[row][col], glow: false, at: Position(row: row, col: col))
+                    updateSeal(key: key, cell: model.cells[row][col], glow: false)
                 }
             }
             if let winningLine {
@@ -199,8 +197,7 @@ final class BoardSceneController: NSObject {
     func dropSeal(at position: Position, player: Player) {
         WaxlinePerf.measure("dropSeal \(position.row),\(position.col)") {
             let key = visualCellKey(row: position.row, col: position.col)
-            sealCoordNames[key] = coordinateName(row: position.row, col: position.col)
-            updateSeal(key: key, cell: player.cell, glow: false, at: position)
+            updateSeal(key: key, cell: player.cell, glow: false)
             if let node = sealNodes[key] {
                 node.position.y = 0.7 * playScale
                 node.runAction(.moveBy(x: 0, y: Double(-0.63 * playScale), z: 0, duration: 0.22))
@@ -214,7 +211,6 @@ final class BoardSceneController: NSObject {
             return
         }
         WaxlinePerf.event("rotate.start", "\(quadrant)")
-        fadeSealCoordLabels(visible: false)
         isAnimating = true
         allowsCellTaps = false
         allowsQuadrantTaps = false
@@ -253,8 +249,6 @@ final class BoardSceneController: NSObject {
             node.scale = SCNVector3(1, 1, 1)
         }
         syncBoard(model, winningLine: nil)
-        restSealCoordLabels()
-        fadeSealCoordLabels(visible: true)
         selectedQuadrant = nil
         isAnimating = false
         let done = rotationCompletion
@@ -270,7 +264,7 @@ final class BoardSceneController: NSObject {
         clearCanvas: Bool = false,
         skin: GameSkin = .classic,
         sakuraTable: SakuraTableTheme = .oak,
-        sakuraTablet: SakuraTabletTheme = .grey,
+        sakuraTablet: SakuraTabletTheme = .charcoal,
         showTable: Bool = true
     ) {
         let t0 = CFAbsoluteTimeGetCurrent()
@@ -309,7 +303,7 @@ final class BoardSceneController: NSObject {
         }
         SCNTransaction.commit()
         scnView?.antialiasingMode = clearCanvas ? .none : .multisampling4X
-        setTabletShadowsVisible(!(skin == .sakura && sakuraTablet == .glass))
+        setTabletShadowsVisible(true)
         if previousSkin != skin || previousPalette != seals {
             warmSealTemplates()
         }
@@ -326,7 +320,7 @@ final class BoardSceneController: NSObject {
         tablet: TabletFinish,
         skin: GameSkin = .classic,
         sakuraTable: SakuraTableTheme = .oak,
-        sakuraTablet: SakuraTabletTheme = .grey,
+        sakuraTablet: SakuraTabletTheme = .charcoal,
         showTable: Bool = true
     ) {
         let t0 = CFAbsoluteTimeGetCurrent()
@@ -340,7 +334,7 @@ final class BoardSceneController: NSObject {
         for (quadrant, node) in quadrantNodes {
             paintQuadrant(node, tablet: tablet, skin: skin, sakuraTablet: sakuraTablet, quadrant: quadrant)
         }
-        setTabletShadowsVisible(!(skin == .sakura && sakuraTablet == .glass))
+        setTabletShadowsVisible(true)
         SCNTransaction.commit()
         let ms = (CFAbsoluteTimeGetCurrent() - t0) * 1000
         WaxlinePerf.event("applyLook.surfaces", String(format: "%.1fms", ms))
@@ -403,7 +397,6 @@ final class BoardSceneController: NSObject {
 
     func resetTabletOrientation() {
         tabletTurns.removeAll()
-        sealCoordNames.removeAll()
         for node in quadrantNodes.values {
             node.eulerAngles.y = 0
         }
@@ -434,7 +427,7 @@ final class BoardSceneController: NSObject {
             skin: skin,
             sakuraTablet: sakuraTablet
         )
-        paintTablet(node, top: top, edge: edge, glass: skin == .sakura && sakuraTablet == .glass)
+        paintTablet(node, top: top, edge: edge)
     }
 
     private func paintTablet(_ node: SCNNode, top: SCNMaterial, edge: SCNMaterial, glass: Bool = false) {
@@ -482,7 +475,6 @@ final class BoardSceneController: NSObject {
 
     func beginTablePan(at viewPoint: CGPoint, in view: SCNView) {
         WaxlinePerf.event("table.spin.start", "hidden=\(tableNode.isHidden)")
-        fadeSealCoordLabels(visible: false)
         boardRoot.position = boardRestPosition
         panStartAngle = restYaw
         panTabletDelta = 0
@@ -635,7 +627,6 @@ final class BoardSceneController: NSObject {
     private func beginTabletPan(at viewPoint: CGPoint, in view: SCNView) {
         WaxlinePerf.event("tablet.spin.start", "\(panQuadrant?.rawValue ?? -1)")
         guard let quadrant = panQuadrant, let node = quadrantNodes[quadrant] else { return }
-        fadeSealCoordLabels(visible: false)
         selectTablet(quadrant)
         panStartTabletYaw = node.eulerAngles.y
         panTabletDelta = 0
@@ -680,12 +671,6 @@ final class BoardSceneController: NSObject {
             SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             node.eulerAngles.y = tabletYaw(quadrant)
             node.scale = SCNVector3(1, 1, 1)
-            SCNTransaction.completionBlock = { [weak self] in
-                Task { @MainActor [weak self] in
-                    self?.restSealCoordLabels()
-                    self?.fadeSealCoordLabels(visible: true)
-                }
-            }
             SCNTransaction.commit()
         }
         clearTabletSelection()
@@ -762,12 +747,6 @@ final class BoardSceneController: NSObject {
         boardRoot.position = boardRestPosition
         boardRoot.eulerAngles.y = yaw
         boardRoot.scale = SCNVector3(1, 1, 1)
-        SCNTransaction.completionBlock = { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.restSealCoordLabels()
-                self?.fadeSealCoordLabels(visible: true)
-            }
-        }
         SCNTransaction.commit()
     }
 
@@ -1132,12 +1111,9 @@ final class BoardSceneController: NSObject {
         return node
     }
 
-    private func updateSeal(key: String, cell: Cell, glow: Bool, at position: Position) {
+    private func updateSeal(key: String, cell: Cell, glow: Bool) {
         sealNodes[key]?.removeFromParentNode()
         sealNodes[key] = nil
-        if cell == .empty {
-            sealCoordNames[key] = nil
-        }
         guard cell != .empty, let parent = cellNodes[key] else { return }
         let player: Player = cell == .red ? .red : .indigo
         let color = PaperStyle.waxColor(for: player, palette: sealPalette, skin: boardSkin)
@@ -1146,18 +1122,6 @@ final class BoardSceneController: NSObject {
         seal.position.y = 0.07 * playScale
         parent.addChildNode(seal)
         sealNodes[key] = seal
-        if boardSkin == .sakura {
-            let onWhite = sealPalette == .mono && player == .indigo
-            let name = sealCoordNames[key] ?? coordinateName(row: position.row, col: position.col)
-            sealCoordNames[key] = name
-            let label = makeSealCoordinateLabel(
-                name,
-                onWhite: onWhite
-            )
-            label.opacity = sealCoordLabelsHidden ? 0 : 1
-            seal.addChildNode(label)
-            restSealCoordLabel(label, on: seal)
-        }
     }
 
     private func clonedSeal(color: UIColor, motifColor: UIColor, glow: Bool) -> SCNNode {
@@ -1213,84 +1177,6 @@ final class BoardSceneController: NSObject {
 
     private func cellKey(row: Int, col: Int) -> String { "\(row)_\(col)" }
 
-    private func coordinateName(row: Int, col: Int) -> String {
-        let column = Character(UnicodeScalar(65 + col)!)
-        return "\(column)\(row + 1)"
-    }
-
-    private func fadeSealCoordLabels(visible: Bool, duration: TimeInterval = 0.28) {
-        guard boardSkin == .sakura else { return }
-        sealCoordLabelsHidden = !visible
-        SCNTransaction.begin()
-        SCNTransaction.animationDuration = duration
-        SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        for seal in sealNodes.values {
-            for child in seal.childNodes where child.name?.hasPrefix("seal_coord_") == true {
-                child.opacity = visible ? 1 : 0
-            }
-        }
-        SCNTransaction.commit()
-    }
-
-    private func restSealCoordLabels() {
-        guard boardSkin == .sakura else { return }
-        for seal in sealNodes.values {
-            guard let label = seal.childNodes.first(where: { $0.name?.hasPrefix("seal_coord_") == true }) else { continue }
-            restSealCoordLabel(label, on: seal)
-        }
-    }
-
-    private func restSealCoordLabel(_ label: SCNNode, on seal: SCNNode) {
-        let yaw = atan2(seal.worldTransform.m13, seal.worldTransform.m11)
-        let ox = 0.20 * playScale
-        let oz = 0.20 * playScale
-        let cosine = cos(yaw)
-        let sine = sin(yaw)
-        label.position = SCNVector3(
-            ox * cosine + oz * sine,
-            0.09 * playScale,
-            -ox * sine + oz * cosine
-        )
-        let desired = simd_quatf(angle: -.pi / 2, axis: SIMD3<Float>(1, 0, 0))
-        label.simdOrientation = simd_quatf(seal.simdWorldTransform).inverse * desired
-    }
-
-    private func makeSealCoordinateLabel(_ name: String, onWhite: Bool) -> SCNNode {
-        let image = sealCoordinateImage(name, onWhite: onWhite)
-        let plane = SCNPlane(width: CGFloat(0.28 * playScale), height: CGFloat(0.18 * playScale))
-        let material = SCNMaterial()
-        material.diffuse.contents = image
-        material.transparent.contents = image
-        material.lightingModel = .constant
-        material.isDoubleSided = true
-        material.writesToDepthBuffer = false
-        plane.materials = [material]
-        let node = SCNNode(geometry: plane)
-        node.name = "seal_coord_\(name)"
-        node.castsShadow = false
-        node.renderingOrder = 24
-        return node
-    }
-
-    private func sealCoordinateImage(_ name: String, onWhite: Bool) -> UIImage {
-        let size = CGSize(width: 96, height: 64)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { _ in
-            let font = UIFont(name: "Georgia-Bold", size: 40) ?? .systemFont(ofSize: 40, weight: .bold)
-            let text = name as NSString
-            let color = onWhite
-                ? UIColor(red: 0.10, green: 0.09, blue: 0.08, alpha: 1)
-                : UIColor(red: 0.84, green: 0.80, blue: 0.74, alpha: 1)
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: color
-            ]
-            let textSize = text.size(withAttributes: attributes)
-            let origin = CGPoint(x: (size.width - textSize.width) / 2, y: (size.height - textSize.height) / 2)
-            text.draw(at: origin, withAttributes: attributes)
-        }
-    }
-
     private func visualCellKey(row: Int, col: Int) -> String {
         guard let quadrant = Quadrant.allCases.first(where: {
             let localRow = row - $0.rowOffset
@@ -1327,7 +1213,7 @@ final class BoardSceneController: NSObject {
         }
         for position in line {
             let key = visualCellKey(row: position.row, col: position.col)
-            updateSeal(key: key, cell: model.cells[position.row][position.col], glow: true, at: position)
+            updateSeal(key: key, cell: model.cells[position.row][position.col], glow: true)
             guard let seal = sealNodes[key] else { continue }
             seal.position.y = 0.2 * playScale
             seal.scale = SCNVector3(1.16, 1.16, 1.16)

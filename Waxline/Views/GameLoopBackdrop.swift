@@ -69,6 +69,7 @@ private struct FillPlayerView: UIViewRepresentable {
             super.init(frame: frame)
             backgroundColor = .clear
             clipsToBounds = true
+            isUserInteractionEnabled = false
             playerLayer.videoGravity = .resizeAspectFill
             layer.addSublayer(playerLayer)
         }

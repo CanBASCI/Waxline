@@ -8,7 +8,7 @@ enum Theme {
     static let waxRed = Color(red: 0.69, green: 0.13, blue: 0.18)
     static let waxIndigo = Color(red: 0.18, green: 0.16, blue: 0.42)
     static let waxCinnabar = Color(red: 0.76, green: 0.16, blue: 0.18)
-    static let waxPlum = Color(red: 0.15, green: 0.14, blue: 0.15)
+    static let waxDusk = Color(red: 0.29, green: 0.25, blue: 0.42)
     static let gold = Color(red: 0.95, green: 0.82, blue: 0.45)
     static let waxBlack = Color(red: 0.10, green: 0.09, blue: 0.08)
     static let waxWhite = Color(red: 0.95, green: 0.95, blue: 0.96)
@@ -29,7 +29,7 @@ enum Theme {
         if skin == .sakura {
             switch (palette, player) {
             case (.classic, .red): waxCinnabar
-            case (.classic, .indigo): waxPlum
+            case (.classic, .indigo): waxDusk
             case (.mono, .red): waxBlack
             case (.mono, .indigo): waxWhite
             }
@@ -51,7 +51,6 @@ struct RootView: View {
     @State private var showSettings = false
     @State private var showOnboarding = false
     @State private var menuIntro = MenuIntroPlayback()
-    @State private var gameSkin: GameSkin = .classic
 
     var body: some View {
         @Bindable var gameCenter = gameCenter
@@ -61,22 +60,14 @@ struct RootView: View {
             && !gameCenter.matchmakerPresented
         ZStack {
             if let game {
-                if gameSkin == .classic {
-                    Theme.cream.ignoresSafeArea()
-                }
-                GameView(game: game, skin: gameSkin, onExit: {
-                    self.game = nil
-                    gameSkin = .classic
-                })
+                GameView(game: game, onExit: { self.game = nil })
             } else {
                 MenuView(
                     playback: menuIntro,
-                    onLocal: { start(.local) },
                     onAI: { start(.ai(settings.aiLevel)) },
                     onGameCenter: { gameCenter.presentMatchmaker() },
                     onSettings: { showSettings = true },
-                    onHowToPlay: { showOnboarding = true },
-                    onTest: { start(.local, skin: .sakura) }
+                    onHowToPlay: { showOnboarding = true }
                 )
             }
         }
@@ -131,9 +122,8 @@ struct RootView: View {
         }
     }
 
-    private func start(_ mode: GameMode, skin: GameSkin = .classic) {
+    private func start(_ mode: GameMode) {
         menuIntro.setMenuVisible(false)
-        gameSkin = skin
         game = GameState(mode: mode)
     }
 

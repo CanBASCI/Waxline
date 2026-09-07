@@ -14,7 +14,7 @@ enum PaperStyle {
     static let waxRed = UIColor(red: 0.69, green: 0.13, blue: 0.18, alpha: 1)
     static let waxIndigo = UIColor(red: 0.18, green: 0.16, blue: 0.42, alpha: 1)
     static let waxCinnabar = UIColor(red: 0.76, green: 0.16, blue: 0.18, alpha: 1)
-    static let waxPlum = UIColor(red: 0.15, green: 0.14, blue: 0.15, alpha: 1)
+    static let waxDusk = UIColor(red: 0.29, green: 0.25, blue: 0.42, alpha: 1)
     static let gold = UIColor(red: 0.72, green: 0.55, blue: 0.28, alpha: 1)
 
     private static let woodMap = makeWood(size: 512)
@@ -77,7 +77,7 @@ enum PaperStyle {
         if skin == .sakura {
             switch (palette, player) {
             case (.classic, .red): waxCinnabar
-            case (.classic, .indigo): waxPlum
+            case (.classic, .indigo): waxDusk
             case (.mono, .red): waxBlack
             case (.mono, .indigo): waxWhite
             }
@@ -116,7 +116,7 @@ enum PaperStyle {
         recessed: Bool,
         offset: Float = 0,
         skin: GameSkin = .classic,
-        sakuraTablet: SakuraTabletTheme = .grey
+        sakuraTablet: SakuraTabletTheme = .charcoal
     ) -> SCNMaterial {
         if skin == .sakura {
             return sakuraTabletMaterial(sakuraTablet, recessed: recessed, offset: offset)
@@ -149,24 +149,23 @@ enum PaperStyle {
         return material
     }
 
-    static func sakuraTabletMaterial(_ theme: SakuraTabletTheme = .grey, recessed: Bool, offset: Float = 0) -> SCNMaterial {
+    static func sakuraTabletMaterial(_ theme: SakuraTabletTheme = .charcoal, recessed: Bool, offset: Float = 0) -> SCNMaterial {
         let cacheKey = "\(theme.rawValue)-\(recessed)"
         if let cached = sakuraTabletCache[cacheKey] {
             return cached
         }
-        if theme == .glass {
-            let material = sakuraGlassMaterial(recessed: recessed)
-            sakuraTabletCache[cacheKey] = material
-            return material
-        }
-        if let name = theme.colorResource, let color = bundleJPEG(name) {
-            let scale: Float = 1.85
-            let material = textured(color, roughness: recessed ? 0.68 : 0.52, metalness: 0.03)
-            applyRepeat(material, scale: scale, offset: offset)
+        if let color = bundleJPEG(theme.colorResource) {
+            let roughness: CGFloat = theme == .blossom
+                ? (recessed ? 0.58 : 0.42)
+                : (recessed ? 0.68 : 0.52)
+            let material = textured(color, roughness: roughness, metalness: 0.03)
+            applyRepeat(material, scale: 1.85, offset: offset)
             if recessed {
-                material.multiply.contents = UIColor(red: 0.52, green: 0.53, blue: 0.56, alpha: 1)
-            } else if theme == .grey {
-                material.multiply.contents = UIColor(red: 0.70, green: 0.71, blue: 0.74, alpha: 1)
+                if theme == .blossom {
+                    material.multiply.contents = UIColor(red: 0.72, green: 0.54, blue: 0.58, alpha: 1)
+                } else {
+                    material.multiply.contents = UIColor(red: 0.52, green: 0.53, blue: 0.56, alpha: 1)
+                }
             }
             sakuraTabletCache[cacheKey] = material
             return material
@@ -176,30 +175,6 @@ enum PaperStyle {
         if recessed {
             material.multiply.contents = UIColor(red: 0.78, green: 0.74, blue: 0.72, alpha: 1)
         }
-        return material
-    }
-
-    static func sakuraGlassMaterial(recessed: Bool) -> SCNMaterial {
-        let material = SCNMaterial()
-        if recessed {
-            material.diffuse.contents = UIColor(red: 0.90, green: 0.95, blue: 0.98, alpha: 0.42)
-            material.transparency = 0.38
-            material.shininess = 48
-        } else {
-            material.diffuse.contents = UIColor(red: 0.94, green: 0.98, blue: 1.0, alpha: 0.08)
-            material.transparency = 0.90
-            material.shininess = 96
-        }
-        material.ambient.contents = UIColor.white.withAlphaComponent(0.04)
-        material.specular.contents = UIColor.white
-        material.transparent.contents = UIColor.white
-        material.lightingModel = .phong
-        material.blendMode = .alpha
-        material.transparencyMode = .singleLayer
-        material.isDoubleSided = true
-        material.writesToDepthBuffer = recessed
-        material.readsFromDepthBuffer = true
-        material.locksAmbientWithDiffuse = false
         return material
     }
 
