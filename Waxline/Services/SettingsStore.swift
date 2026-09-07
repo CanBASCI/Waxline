@@ -18,6 +18,9 @@ final class SettingsStore {
     var hasCompletedOnboarding: Bool {
         didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: Keys.onboarding) }
     }
+    var sakuraLook: SakuraLook {
+        didSet { UserDefaults.standard.set(sakuraLook.rawValue, forKey: Keys.sakuraLook) }
+    }
 
     init() {
         let defaults = UserDefaults.standard
@@ -26,6 +29,7 @@ final class SettingsStore {
         aiLevel = AILevel(rawValue: defaults.string(forKey: Keys.ai) ?? "") ?? .medium
         language = LanguageOverride(rawValue: defaults.string(forKey: Keys.language) ?? "") ?? .system
         hasCompletedOnboarding = defaults.bool(forKey: Keys.onboarding)
+        sakuraLook = SakuraLook(rawValue: defaults.string(forKey: Keys.sakuraLook) ?? "") ?? .mono
     }
 
     private enum Keys {
@@ -34,6 +38,7 @@ final class SettingsStore {
         static let ai = "waxline.ai"
         static let language = "waxline.language"
         static let onboarding = "waxline.onboarding"
+        static let sakuraLook = "waxline.sakuraLook"
     }
 }
 

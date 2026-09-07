@@ -12,7 +12,10 @@ struct GameView: View {
     @State private var showResult = false
     @State private var is3DView = false
     @State private var showLookPanel = false
-    @State private var sakuraLook: SakuraLook = .mono
+    private var sakuraLook: SakuraLook {
+        get { settings.sakuraLook }
+        nonmutating set { settings.sakuraLook = newValue }
+    }
     private var sakuraTablet: SakuraTabletTheme {
         sakuraLook == .color ? .blossom : .charcoal
     }
@@ -191,7 +194,7 @@ struct GameView: View {
                 Text(turnTitle)
                     .font(bannerFont)
                     .foregroundStyle(overlayCopy)
-                    .modifier(OverlayReadable(onLight: sakuraLook == .color))
+                    .modifier(OverlayReadable())
                 Spacer(minLength: 8)
             }
             HStack(alignment: .center, spacing: 8) {
@@ -230,8 +233,7 @@ struct GameView: View {
             .multilineTextAlignment(.leading)
             .lineLimit(3)
             .minimumScaleFactor(0.8)
-            .modifier(OverlayReadable(onLight: sakuraLook == .color))
-            .animation(.easeInOut(duration: 0.22), value: sakuraLook)
+            .modifier(OverlayReadable())
             .opacity(boardStatusText == nil ? 0 : 1)
             .frame(maxWidth: .infinity, minHeight: footerSlotHeight, maxHeight: footerSlotHeight, alignment: .bottomLeading)
     }
@@ -323,16 +325,18 @@ struct GameView: View {
             scene.setPerspective3D(is3DView)
             HapticsService.select(enabled: settings.hapticsEnabled)
         } label: {
-            Text(is3DView ? t("view_3d") : t("view_2d"))
-                .font(hudMeterFont)
-                .foregroundStyle(lookChipInk)
+            Image(systemName: is3DView ? "cube" : "square")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(hudChromeInk)
+                .frame(minWidth: 28)
                 .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(lookChipFill, in: Capsule())
+                .padding(.vertical, 6)
+                .background(hudChromeFill, in: Capsule())
                 .overlay {
-                    Capsule().stroke(lookChipInk.opacity(0.35), lineWidth: 1)
+                    Capsule().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
                 }
                 .shadow(color: textHalo, radius: 8)
+                .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(is3DView ? t("view_3d") : t("view_2d"))
@@ -370,7 +374,7 @@ struct GameView: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
                 }
-                .frame(width: 180, height: lookPanelClipHeight, alignment: .topTrailing)
+                .frame(width: 108, height: lookPanelClipHeight, alignment: .topTrailing)
                 .clipped()
                 .allowsHitTesting(showLookPanel)
             }
@@ -378,34 +382,57 @@ struct GameView: View {
         .animation(.easeOut(duration: 0.25), value: showLookPanel)
     }
 
-    private var lookPanelClipHeight: CGFloat { 40 }
+    private var lookSwitchTrack: Color {
+        sakuraLook == .color ? Theme.cream.opacity(0.94) : Theme.waxBlack.opacity(0.28)
+    }
+    private var lookSwitchStroke: Color {
+        sakuraLook == .color ? Theme.waxCinnabar.opacity(0.32) : Theme.cream.opacity(0.28)
+    }
+    private var lookPanelClipHeight: CGFloat { 38 }
 
     private var lookPanelChips: some View {
-        lookChip(t(sakuraLook == .mono ? "sakura_look_mono" : "sakura_look_color")) {
-            sakuraLook.cycle()
-            applyBoardLook()
-            scene.syncBoard(game.model, winningLine: nil, force: true)
-        }
+        lookSwitch
     }
 
-    private func lookChip(_ title: String, action: @escaping () -> Void) -> some View {
-        Button {
-            action()
+    private var lookSwitch: some View {
+        HStack(spacing: 2) {
+            lookFace(.mono)
+            lookFace(.color)
+        }
+        .padding(2)
+        .background(lookSwitchTrack, in: Capsule())
+        .overlay {
+            Capsule().stroke(lookSwitchStroke, lineWidth: 1)
+        }
+        .animation(.easeInOut(duration: 0.22), value: sakuraLook)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func lookFace(_ look: SakuraLook) -> some View {
+        let selected = sakuraLook == look
+        let colors: [Color] = look == .mono
+            ? [Theme.waxBlack, Theme.waxWhite]
+            : [Theme.waxCinnabar, Theme.waxDusk]
+        return Button {
+            guard sakuraLook != look else { return }
+            sakuraLook = look
+            applyBoardLook()
+            scene.syncBoard(game.model, winningLine: nil, force: true)
             HapticsService.select(enabled: settings.hapticsEnabled)
         } label: {
-            Text(title)
-                .font(.system(.caption, design: .serif).weight(.semibold))
-                .foregroundStyle(lookChipInk)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: true)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(lookChipFill, in: Capsule())
+            Capsule()
+                .fill(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing))
+                .frame(width: 22, height: 9)
                 .overlay {
-                    Capsule().stroke(lookChipInk.opacity(0.35), lineWidth: 1)
+                    Capsule().stroke(Theme.ink.opacity(look == .mono ? 0.22 : 0), lineWidth: 0.6)
                 }
+                .frame(width: 46, height: 28)
+                .background(selected ? Theme.waxWhite : Color.clear, in: Capsule())
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(t(look == .mono ? "sakura_look_mono" : "sakura_look_color"))
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var resultScheme: ColorScheme { sakuraLook == .color ? .light : .dark }
@@ -414,22 +441,18 @@ struct GameView: View {
     private var boardInk: Color { ink }
     private var textHalo: Color { Color.black.opacity(0.55) }
     private var overlayHalo: Color { Color.black.opacity(0.55) }
-    private var overlayCopy: Color {
-        sakuraLook == .color ? Theme.waxDusk : Theme.ink(dark: true)
-    }
-    private var lookChipFill: Color { Theme.waxWhite }
-    private var lookChipInk: Color { Theme.ink }
+    private var overlayCopy: Color { Theme.ink(dark: true) }
     private var hudChromeFill: Color {
-        sakuraLook == .color ? Theme.waxDusk : Theme.waxBlack
+        sakuraLook == .color ? Theme.cream : Theme.waxBlack
     }
     private var hudChromeInk: Color {
-        sakuraLook == .color ? Theme.cream : Theme.cream
+        sakuraLook == .color ? Theme.waxCinnabar : Theme.cream
     }
     private var bannerFont: Font { .system(.body, design: .serif).weight(.medium) }
     private var hudMeterFont: Font { .system(.title2, design: .serif).weight(.medium) }
     private var turnTimerColor: Color {
         if turnSecondsLeft <= 5 { return Theme.waxRed }
-        return lookChipInk
+        return sakuraLook == .color ? Theme.ink : Theme.cream
     }
 
     private var currentColor: Color {
@@ -476,9 +499,9 @@ struct GameView: View {
             .frame(minWidth: 28, alignment: .center)
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
-            .background(lookChipFill, in: Capsule())
+            .background(hudChromeFill, in: Capsule())
             .overlay {
-                Capsule().stroke(lookChipInk.opacity(0.35), lineWidth: 1)
+                Capsule().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
             }
             .shadow(color: textHalo, radius: 8)
             .opacity(isHumanTurn && turnSecondsLeft > 0 ? 1 : 0)
@@ -772,20 +795,11 @@ struct GameView: View {
 }
 
 private struct OverlayReadable: ViewModifier {
-    var onLight: Bool
-
     func body(content: Content) -> some View {
-        if onLight {
-            content
-                .shadow(color: Color.white.opacity(0.85), radius: 0, y: 1)
-                .shadow(color: Color.white.opacity(0.55), radius: 3)
-                .shadow(color: Theme.cream.opacity(0.4), radius: 8)
-        } else {
-            content
-                .shadow(color: .black.opacity(0.95), radius: 0, y: 1)
-                .shadow(color: .black.opacity(0.8), radius: 3)
-                .shadow(color: .black.opacity(0.45), radius: 8)
-        }
+        content
+            .shadow(color: .black.opacity(0.95), radius: 0, y: 1)
+            .shadow(color: .black.opacity(0.8), radius: 3)
+            .shadow(color: .black.opacity(0.45), radius: 8)
     }
 }
 
