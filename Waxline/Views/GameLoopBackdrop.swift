@@ -10,7 +10,7 @@ struct GameLoopBackdrop: View {
 
     var body: some View {
         ZStack {
-            Color(white: 0.86)
+            Color.black
             if let player {
                 FillPlayerView(player: player)
             }

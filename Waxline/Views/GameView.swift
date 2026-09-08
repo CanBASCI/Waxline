@@ -16,6 +16,7 @@ struct GameView: View {
     @State private var confirmLeave = false
     @State private var showInviteDeclined = false
     @State private var is3DView = false
+    @State private var tilt = TiltParallax()
     private var sakuraLook: SakuraLook {
         get { settings.sakuraLook }
         nonmutating set { settings.sakuraLook = newValue }
@@ -85,17 +86,25 @@ struct GameView: View {
                 .frame(height: 150)
                 .allowsHitTesting(false)
             }
+            .scaleEffect(backdropExpanded ? 1.14 : 1)
+            .tiltShift(tilt, travel: 26)
+            .animation(.easeOut(duration: 0.2), value: backdropExpanded)
             .ignoresSafeArea()
         }
         .preferredColorScheme(.dark)
         .onAppear {
             configureScene()
             startInviteWatchIfNeeded()
+            tilt.setActive(is3DView)
+        }
+        .onChange(of: is3DView) { _, on in
+            tilt.setActive(on)
         }
         .onChange(of: waitingForOpponent) { _, _ in
             startInviteWatchIfNeeded()
         }
         .onChange(of: scenePhase) { _, phase in
+            tilt.setActive(is3DView && phase == .active)
             guard waitingForOpponent else { return }
             if phase == .background {
                 Task { await gameCenter.pulseWaitingHeartbeat(suspended: true) }
@@ -150,16 +159,20 @@ struct GameView: View {
             remotePlaybackTask?.cancel()
             inviteWatchTask?.cancel()
             stopTurnTimer()
+            tilt.setActive(false)
         }
     }
 
     private var playStack: some View {
         VStack(spacing: 0) {
             header
+                .tiltShift(tilt, travel: 11)
             turnBanner
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .tiltShift(tilt, travel: 11)
             HStack(alignment: .center, spacing: 8) {
                 turnTimer
+                    .tiltShift(tilt, travel: 11)
                 Spacer(minLength: 8)
                 perspectiveChip
             }
@@ -180,6 +193,7 @@ struct GameView: View {
                 .padding(.top, 0)
                 .padding(.bottom, boardGutter)
             footer
+                .tiltShift(tilt, travel: 11)
         }
     }
 
@@ -500,6 +514,10 @@ struct GameView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(t("look_settings"))
         .accessibilityValue(t(sakuraLook == .mono ? "sakura_look_mono" : "sakura_look_color"))
+    }
+
+    private var backdropExpanded: Bool {
+        is3DView || abs(tilt.x) > 0.002 || abs(tilt.y) > 0.002
     }
 
     private var activeSeals: SealPalette { sakuraLook == .mono ? .mono : .classic }
