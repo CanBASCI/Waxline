@@ -103,6 +103,7 @@ extension GameCenterService {
             return
         }
         if matchmakerPresented { return }
+        if let until = matchmakerSuppressUntil, Date() < until { return }
         if topViewController() is GKMatchmakerViewController { return }
         matchmakerPresented = true
         guard let controller = GKMatchmakerViewController(matchRequest: request) else {
@@ -157,20 +158,26 @@ extension GameCenterService {
         guard topViewController() is GKMatchmakerViewController else { return }
         topViewController()?.dismiss(animated: false)
     }
+
+    func finishMatchmaker(_ viewController: GKMatchmakerViewController, error: Error? = nil) {
+        GKMatchmaker.shared().cancel()
+        matchmakerSuppressUntil = Date().addingTimeInterval(1.2)
+        viewController.dismiss(animated: true) { [weak self] in
+            self?.matchmakerPresented = false
+        }
+        if let error, !isBenignMatchmakerDismissal(error) {
+            lastErrorMessage = error.localizedDescription
+        }
+    }
 }
 
 extension GameCenterService: GKMatchmakerViewControllerDelegate {
     func matchmakerViewControllerWasCancelled(_ viewController: GKMatchmakerViewController) {
-        viewController.dismiss(animated: true) { [weak self] in
-            self?.matchmakerPresented = false
-        }
+        finishMatchmaker(viewController)
     }
 
     func matchmakerViewController(_ viewController: GKMatchmakerViewController, didFailWithError error: Error) {
-        lastErrorMessage = error.localizedDescription
-        viewController.dismiss(animated: true) { [weak self] in
-            self?.matchmakerPresented = false
-        }
+        finishMatchmaker(viewController, error: error)
     }
 
     func matchmakerViewController(_ viewController: GKMatchmakerViewController, didFind match: GKMatch) {

@@ -23,6 +23,7 @@ final class GameCenterService: NSObject {
     var pendingGKInvite: GKInvite?
     var didLeaveLocally = false
     var didAnnounceLive = false
+    var matchmakerSuppressUntil: Date?
 
     var hasActiveSession: Bool { liveMatch != nil || activeMatch != nil }
 
@@ -132,7 +133,10 @@ final class GameCenterService: NSObject {
                 }
             }
             if let error {
-                self.lastErrorMessage = error.localizedDescription
+                let skip = isAuthenticated && isTransientGameCenterError(error)
+                if !skip {
+                    self.lastErrorMessage = error.localizedDescription
+                }
             }
         }
     }
@@ -223,5 +227,25 @@ final class GameCenterService: NSObject {
             top = presented
         }
         return top
+    }
+
+    func isTransientGameCenterError(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain {
+            switch ns.code {
+            case NSURLErrorCancelled, NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost, NSURLErrorNotConnectedToInternet:
+                return true
+            default:
+                break
+            }
+        }
+        return false
+    }
+
+    func isBenignMatchmakerDismissal(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == "ExtensionErrorDomain", ns.code == -5900 { return true }
+        if ns.domain == GKErrorDomain, ns.code == GKError.Code.cancelled.rawValue { return true }
+        return isTransientGameCenterError(error)
     }
 }

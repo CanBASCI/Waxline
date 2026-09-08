@@ -18,7 +18,8 @@ struct ResultSheet: View {
             SealMark(
                 color: badgeColor,
                 motif: badgeMotif,
-                outline: badgeOutline
+                outline: Color(white: 0.96).opacity(0.4),
+                outlineWidth: 1
             )
             .frame(width: 44, height: 44)
             .padding(.top, 8)
@@ -185,16 +186,5 @@ struct ResultSheet: View {
         if case .draw = game.status { return Theme.waxBlack }
         if case .playing = game.status { return Theme.waxBlack }
         return Theme.gold
-    }
-
-    private var badgeOutline: Color? {
-        guard seals == .mono else { return nil }
-        if sheetDark, case .won(let player, _) = game.status, player == .red {
-            return Theme.ink(dark: true).opacity(0.7)
-        }
-        if isWhiteWin {
-            return Theme.ink.opacity(0.4)
-        }
-        return nil
     }
 }
