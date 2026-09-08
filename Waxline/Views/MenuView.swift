@@ -219,6 +219,7 @@ struct SeriesScoreRow: View {
     var you: Player = .red
     var sealSize: CGFloat
     var numberColor: Color
+    var sealStroke: Color = Color(white: 0.96).opacity(0.4)
 
     var body: some View {
         HStack(spacing: sealSize * 0.45) {
@@ -248,7 +249,8 @@ struct SeriesScoreRow: View {
             SealMark(
                 color: player.map { Theme.seal($0, palette: seals) } ?? Theme.gold,
                 motif: motif(for: player),
-                outline: outline(for: player)
+                outline: sealStroke,
+                outlineWidth: 1
             )
             .frame(width: sealSize, height: sealSize)
             Text("\(count)")
@@ -263,16 +265,5 @@ struct SeriesScoreRow: View {
         if player == nil { return Theme.waxBlack }
         if seals == .mono, player == .indigo { return Theme.waxBlack }
         return Theme.gold
-    }
-
-    private func outline(for player: Player?) -> Color? {
-        guard seals == .mono else { return nil }
-        if player == .indigo {
-            return Theme.ink.opacity(0.4)
-        }
-        if player == .red {
-            return Theme.ink(dark: true).opacity(0.7)
-        }
-        return Theme.ink.opacity(0.35)
     }
 }

@@ -213,8 +213,13 @@ struct GameView: View {
     private var turnBanner: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 9) {
-                SealMark(color: currentColor, motif: sealMotif, outline: sealOutline)
-                    .frame(width: turnSealSize, height: turnSealSize)
+                SealMark(
+                    color: currentColor,
+                    motif: sealMotif,
+                    outline: hudStepStroke(active: true),
+                    outlineWidth: 1
+                )
+                .frame(width: turnSealSize, height: turnSealSize)
                 Text(turnTitle)
                     .font(turnTitleFont)
                     .foregroundStyle(overlayCopy)
@@ -281,7 +286,7 @@ struct GameView: View {
         }
         .overlay {
             Circle().stroke(
-                overlayCopy.opacity(opponentPhotoDimmed ? 0.08 : 0.28),
+                hudStepStroke(active: !opponentPhotoDimmed),
                 lineWidth: 1
             )
         }
@@ -335,7 +340,8 @@ struct GameView: View {
                 seals: activeSeals,
                 you: seriesYou,
                 sealSize: seriesSealSize,
-                numberColor: overlayCopy
+                numberColor: overlayCopy,
+                sealStroke: hudStepStroke(active: true)
             )
             .fixedSize(horizontal: true, vertical: true)
             .frame(maxWidth: seriesMaxWidth, alignment: .leading)
@@ -516,6 +522,9 @@ struct GameView: View {
     private var turnTitleFont: Font { .system(size: 19.5, weight: .medium, design: .serif) }
     private var turnSealSize: CGFloat { 25 }
     private var hudMeterFont: Font { .system(size: 19.5, weight: .medium, design: .serif) }
+    private func hudStepStroke(active: Bool) -> Color {
+        ink.opacity(active ? 0.4 : 0.28)
+    }
     private var turnTimerColor: Color {
         if turnSecondsLeft <= 5 { return Theme.waxRed }
         return sakuraLook == .color ? Theme.ink : Theme.cream
@@ -537,14 +546,6 @@ struct GameView: View {
             return Theme.waxBlack
         }
         return Theme.gold
-    }
-
-    private var sealOutline: Color? {
-        guard activeSeals == .mono else { return nil }
-        if game.currentPlayer == .red {
-            return ink.opacity(0.7)
-        }
-        return nil
     }
 
     private var turnTitle: String {
@@ -597,7 +598,7 @@ struct GameView: View {
             .frame(height: meterChromeHeight)
             .background(active ? currentColor : ink.opacity(0.16), in: Capsule())
             .overlay {
-                Capsule().stroke(ink.opacity(active ? 0.4 : 0.28), lineWidth: 1)
+                Capsule().stroke(hudStepStroke(active: active), lineWidth: 1)
             }
     }
 
