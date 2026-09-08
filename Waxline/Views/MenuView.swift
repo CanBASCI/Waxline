@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct MenuView: View {
     @Environment(SettingsStore.self) private var settings
@@ -22,7 +21,6 @@ struct MenuView: View {
     private var menuFont: Font { .system(.body, design: .serif).weight(.medium) }
     private var menuLinkFont: Font { .system(size: 18, weight: .medium, design: .serif) }
     @State private var idle = false
-    @State private var lockedBottomInset: CGFloat = 34
 
     var body: some View {
         ZStack {
@@ -31,7 +29,7 @@ struct MenuView: View {
 
             VStack(alignment: .trailing, spacing: 18) {
                 VStack(alignment: .trailing, spacing: 8) {
-                    SealMark(color: Theme.waxRed)
+                    BrandMark()
                         .frame(width: 68, height: 68)
                     Text(t("app_name"))
                         .font(.system(.title, design: .serif).weight(.semibold))
@@ -60,9 +58,8 @@ struct MenuView: View {
                 .allowsHitTesting(playback.didFinish)
             }
             .padding(.trailing, 22)
-            .padding(.bottom, 36 + lockedBottomInset)
+            .padding(.bottom, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-            .ignoresSafeArea(edges: .bottom)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topTrailing) {
@@ -84,7 +81,6 @@ struct MenuView: View {
             }
         }
         .onAppear {
-            lockBottomInset()
             if playback.didFinish { idle = true }
             if gameCenter.isAuthenticated {
                 Task { await gameCenter.refreshPendingInvites() }
@@ -96,15 +92,6 @@ struct MenuView: View {
                 try? await Task.sleep(for: .milliseconds(800))
                 idle = true
             }
-        }
-    }
-
-    private func lockBottomInset() {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        let window = scenes.flatMap(\.windows).first(where: \.isKeyWindow) ?? scenes.first?.windows.first
-        let inset = window?.safeAreaInsets.bottom ?? 0
-        if inset > 0 {
-            lockedBottomInset = inset
         }
     }
 
@@ -176,6 +163,25 @@ private struct MenuLineMotion: ViewModifier {
 private extension View {
     func menuLineMotion(revealed: Bool, idle: Bool, index: Int) -> some View {
         modifier(MenuLineMotion(revealed: revealed, idle: idle, index: index))
+    }
+}
+
+struct BrandMark: View {
+    var body: some View {
+        GeometryReader { geo in
+            let side = min(geo.size.width, geo.size.height)
+            ZStack {
+                RoundedRectangle(cornerRadius: side * 0.28, style: .continuous)
+                    .fill(Theme.waxRed)
+                RoundedRectangle(cornerRadius: side * (148 / 600), style: .continuous)
+                    .stroke(Theme.gold.opacity(0.55), lineWidth: max(1, side * (10 / 600)))
+                    .padding(side * (28 / 600))
+                SealStar(innerRatio: 64 / 150)
+                    .fill(Theme.gold)
+                    .frame(width: side * 0.5, height: side * 0.5)
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
     }
 }
 
@@ -272,10 +278,12 @@ struct SeriesScoreRow: View {
 }
 
 struct SealStar: Shape {
+    var innerRatio: CGFloat = 0.09 / 0.22
+
     func path(in rect: CGRect) -> Path {
         let center = CGPoint(x: rect.midX, y: rect.midY)
         let outer = min(rect.width, rect.height) / 2
-        let inner = outer * (0.09 / 0.22)
+        let inner = outer * innerRatio
         var path = Path()
         for index in 0..<16 {
             let radius = index.isMultiple(of: 2) ? outer : inner

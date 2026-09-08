@@ -988,5 +988,3 @@ nonisolated struct GameCenterInvite: Identifiable, @unchecked Sendable {
         return try? await player.loadPhoto(for: .small)
     }
 }
-
-}
