@@ -378,23 +378,6 @@
         }
       }
     },
-    "gc_player_profile" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Game Center profile"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Game Center profili"
-          }
-        }
-      }
-    },
     "gc_sign_in" : {
       "extractionState" : "manual",
       "localizations" : {

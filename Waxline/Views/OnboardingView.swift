@@ -35,16 +35,13 @@ struct OnboardingView: View {
                 }
                 .padding(.bottom, 14)
 
-                Button(action: advance) {
-                    Text(page == pageCount - 1 ? t("onboarding_done") : t("onboarding_next"))
-                        .font(.system(.body, design: .serif).weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                }
-                .buttonStyle(.borderedProminent)
-                .clipShape(Capsule())
-                .padding(.horizontal, 28)
-                .padding(.bottom, 16)
+                SheetActionButton(
+                    title: page == pageCount - 1 ? t("onboarding_done") : t("onboarding_next"),
+                    prominent: true,
+                    action: advance
+                )
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
@@ -52,7 +49,7 @@ struct OnboardingView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
+        .presentationDragIndicator(.hidden)
         .presentationBackground(.background)
         .preferredColorScheme(settings.sakuraLook.colorScheme)
         .animation(.easeOut(duration: 0.28), value: page)

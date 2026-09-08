@@ -31,6 +31,7 @@ struct SettingsView: View {
                     }
                 }
             }
+            .font(.system(.body, design: .serif))
             .navigationTitle(t("settings_title"))
             .navigationBarTitleDisplayMode(.inline)
         }
