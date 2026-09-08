@@ -314,18 +314,16 @@ struct GameView: View {
 
     private var footerHint: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if game.series.hasHands {
-                SeriesScoreRow(
-                    series: game.series,
-                    seals: activeSeals,
-                    you: seriesYou,
-                    sealSize: seriesSealSize,
-                    numberColor: overlayCopy
-                )
-                .fixedSize(horizontal: true, vertical: true)
-                .frame(maxWidth: seriesMaxWidth, alignment: .leading)
-                .modifier(OverlayReadable())
-            }
+            SeriesScoreRow(
+                series: game.series,
+                seals: activeSeals,
+                you: seriesYou,
+                sealSize: seriesSealSize,
+                numberColor: overlayCopy
+            )
+            .fixedSize(horizontal: true, vertical: true)
+            .frame(maxWidth: seriesMaxWidth, alignment: .leading)
+            .modifier(OverlayReadable())
             Spacer(minLength: 0)
             Text(boardStatusText ?? " ")
                 .font(.system(size: overlayTypeSize, weight: .regular, design: .serif))
