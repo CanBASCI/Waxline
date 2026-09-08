@@ -176,7 +176,7 @@ struct BrandMark: View {
                 RoundedRectangle(cornerRadius: side * (148 / 600), style: .continuous)
                     .stroke(Theme.gold.opacity(0.55), lineWidth: max(1, side * (10 / 600)))
                     .padding(side * (28 / 600))
-                SealStar(innerRatio: 64 / 150)
+                SealStar(innerRatio: SealStarGeometry.brandInnerRatio)
                     .fill(Theme.gold)
                     .frame(width: side * 0.5, height: side * 0.5)
             }
@@ -274,31 +274,5 @@ struct SeriesScoreRow: View {
             return Theme.ink(dark: true).opacity(0.7)
         }
         return Theme.ink.opacity(0.35)
-    }
-}
-
-struct SealStar: Shape {
-    var innerRatio: CGFloat = 0.09 / 0.22
-
-    func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let outer = min(rect.width, rect.height) / 2
-        let inner = outer * innerRatio
-        var path = Path()
-        for index in 0..<16 {
-            let radius = index.isMultiple(of: 2) ? outer : inner
-            let angle = Double(index) * .pi / 8 - .pi / 2
-            let point = CGPoint(
-                x: center.x + CGFloat(cos(angle)) * radius,
-                y: center.y + CGFloat(sin(angle)) * radius
-            )
-            if index == 0 {
-                path.move(to: point)
-            } else {
-                path.addLine(to: point)
-            }
-        }
-        path.closeSubpath()
-        return path
     }
 }

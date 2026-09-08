@@ -21,10 +21,12 @@ ring.stroke()
 let cx = CGFloat(size) / 2
 let cy = CGFloat(size) / 2
 let star = NSBezierPath()
-let points = 8
-for i in 0..<(points * 2) {
-    let radius: CGFloat = i.isMultiple(of: 2) ? 150 : 64
-    let angle = CGFloat(i) * .pi / CGFloat(points) - .pi / 2
+// Same 8-point seal as SealStarGeometry.brandInnerRatio (64 / 150).
+let outer: CGFloat = 150
+let inner: CGFloat = outer * (64 / 150)
+for i in 0..<16 {
+    let radius: CGFloat = i.isMultiple(of: 2) ? outer : inner
+    let angle = CGFloat(i) * .pi / 8 - .pi / 2
     let point = NSPoint(x: cx + cos(angle) * radius, y: cy + sin(angle) * radius)
     if i == 0 { star.move(to: point) } else { star.line(to: point) }
 }

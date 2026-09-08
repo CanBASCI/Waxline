@@ -89,18 +89,7 @@ enum PaperStyle {
     }
 
     static func starPath(scale: CGFloat = 1) -> UIBezierPath {
-        let path = UIBezierPath()
-        let points = 8
-        let outer: CGFloat = 0.22 * scale
-        let inner: CGFloat = 0.09 * scale
-        for i in 0..<(points * 2) {
-            let radius = i.isMultiple(of: 2) ? outer : inner
-            let angle = CGFloat(i) * .pi / CGFloat(points) - .pi / 2
-            let point = CGPoint(x: cos(angle) * radius, y: sin(angle) * radius)
-            if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
-        }
-        path.close()
-        return path
+        SealStarGeometry.bezierPath(outer: 0.22 * scale)
     }
 
     static func bundleImage(_ name: String) -> UIImage? {

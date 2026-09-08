@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct GameView: View {
     @Bindable var game: GameState
@@ -26,6 +27,7 @@ struct GameView: View {
     @State private var timerTask: Task<Void, Never>?
     @State private var remotePlaybackTask: Task<Void, Never>?
     @State private var inviteWatchTask: Task<Void, Never>?
+    @State private var opponentPhoto: UIImage?
     @State private var turnSecondsLeft = 15
     @State private var canvasSize = CGSize(width: 390, height: 844)
     private var isCompactCanvas: Bool { canvasSize.height < 720 }
@@ -122,6 +124,10 @@ struct GameView: View {
         .onChange(of: gameCenter.matchRevision) { _, _ in
             remotePlaybackTask?.cancel()
             remotePlaybackTask = Task { await applyRemoteMatch() }
+            Task { await loadOpponentIdentity() }
+        }
+        .task(id: gameCenter.sessionKey) {
+            await loadOpponentIdentity()
         }
         .sheet(isPresented: $showResult) {
             ResultSheet(game: game, seals: activeSeals, onAgain: replay, onMenu: leaveAndExit)
@@ -214,6 +220,9 @@ struct GameView: View {
                     .foregroundStyle(overlayCopy)
                     .modifier(OverlayReadable())
                 Spacer(minLength: 8)
+                if showsOpponentIdentity {
+                    opponentPhotoMark
+                }
             }
             HStack(alignment: .center, spacing: 8) {
                 if game.status == .playing, !waitingForOpponent {
@@ -227,6 +236,54 @@ struct GameView: View {
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .shadow(color: textHalo, radius: 8)
+    }
+
+    private var showsOpponentIdentity: Bool {
+        game.mode == .gameCenter
+    }
+
+    private var opponentPhotoMark: some View {
+        Group {
+            if let opponentPhoto {
+                Image(uiImage: opponentPhoto)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: "person.crop.circle.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(overlayCopy.opacity(0.85))
+            }
+        }
+        .frame(width: 32, height: 32)
+        .clipShape(Circle())
+        .grayscale(sakuraLook == .mono ? 1 : 0)
+        .overlay {
+            Circle()
+                .fill(Color.black.opacity(sakuraLook == .mono && opponentPhotoDimmed ? 0.62 : 0))
+        }
+        .overlay {
+            Circle().stroke(
+                overlayCopy.opacity(opponentPhotoDimmed ? 0.08 : 0.28),
+                lineWidth: 1
+            )
+        }
+        .opacity(opponentPhotoDimmed ? opponentPhotoDimOpacity : 1)
+        .animation(.easeInOut(duration: 0.28), value: opponentPhotoDimmed)
+        .accessibilityLabel(gameCenter.opponentDisplayName)
+        .accessibilityValue(opponentPhotoDimmed ? t("turn_you") : t("turn_waiting"))
+    }
+
+    private var opponentPhotoDimmed: Bool {
+        game.status == .playing && isLocalTurn && !waitingForOpponent
+    }
+
+    private var opponentPhotoDimOpacity: CGFloat {
+        sakuraLook == .mono ? 0.42 : 0.38
+    }
+
+    private func loadOpponentIdentity() async {
+        opponentPhoto = await gameCenter.loadOpponentPhoto()
     }
 
     private var footer: some View {

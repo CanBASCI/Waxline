@@ -183,6 +183,7 @@ struct ResultSheet: View {
     private var badgeMotif: Color {
         if isWhiteWin { return Theme.waxBlack }
         if case .draw = game.status { return Theme.waxBlack }
+        if opponentLeft { return Theme.waxBlack }
         return Theme.gold
     }
 
