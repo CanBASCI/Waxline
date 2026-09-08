@@ -93,15 +93,6 @@ struct RootView: View {
             }
             .preferredColorScheme(settings.sakuraLook.colorScheme)
         }
-        .fullScreenCover(isPresented: $gameCenter.matchmakerPresented) {
-            TurnBasedMatchmakerView(
-                onMatch: { match in
-                    openGameCenter(match)
-                },
-                onCancel: { gameCenter.matchmakerPresented = false }
-            )
-            .ignoresSafeArea()
-        }
         .background {
             if let controller = gameCenter.authViewController {
                 GameCenterAuthPresenter(viewController: controller)

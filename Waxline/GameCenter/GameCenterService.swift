@@ -40,12 +40,35 @@ final class GameCenterService: NSObject {
             authenticate()
             return
         }
+        if matchmakerPresented { return }
         matchmakerPresented = true
+        GKTurnBasedMatch.loadMatches { [weak self] matches, _ in
+            let hasExisting = !(matches ?? []).isEmpty
+            DispatchQueue.main.async {
+                self?.presentMatchmaker(showingExisting: hasExisting)
+            }
+        }
+    }
+
+    private func presentMatchmaker(showingExisting: Bool) {
+        guard matchmakerPresented else { return }
+        guard topViewController() is GKTurnBasedMatchmakerViewController == false else { return }
+        let request = GKMatchRequest()
+        request.minPlayers = 2
+        request.maxPlayers = 2
+        request.defaultNumberOfPlayers = 2
+        let controller = GKTurnBasedMatchmakerViewController(matchRequest: request)
+        controller.turnBasedMatchmakerDelegate = self
+        controller.showExistingMatches = showingExisting
+        topViewController()?.present(controller, animated: true)
     }
 
     func attach(match: GKTurnBasedMatch) {
         activeMatch = match
-        matchmakerPresented = false
+        if matchmakerPresented {
+            matchmakerPresented = false
+            dismissMatchmakerIfNeeded()
+        }
     }
 
     func localPlayerColor(in match: GKTurnBasedMatch) -> Player {
@@ -107,10 +130,46 @@ final class GameCenterService: NSObject {
             lastErrorMessage = error.localizedDescription
         }
     }
+
+    private func topViewController() -> UIViewController? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let window = scenes.flatMap(\.windows).first(where: \.isKeyWindow) ?? scenes.first?.windows.first
+        var top = window?.rootViewController
+        while let presented = top?.presentedViewController {
+            top = presented
+        }
+        return top
+    }
+
+    private func dismissMatchmakerIfNeeded() {
+        guard topViewController() is GKTurnBasedMatchmakerViewController else { return }
+        topViewController()?.dismiss(animated: false)
+    }
+}
+
+extension GameCenterService: GKTurnBasedMatchmakerViewControllerDelegate {
+    func turnBasedMatchmakerViewControllerWasCancelled(_ viewController: GKTurnBasedMatchmakerViewController) {
+        viewController.dismiss(animated: true) { [weak self] in
+            self?.matchmakerPresented = false
+        }
+    }
+
+    func turnBasedMatchmakerViewController(
+        _ viewController: GKTurnBasedMatchmakerViewController,
+        didFailWithError error: Error
+    ) {
+        lastErrorMessage = error.localizedDescription
+        viewController.dismiss(animated: true) { [weak self] in
+            self?.matchmakerPresented = false
+        }
+    }
 }
 
 extension GameCenterService: GKLocalPlayerListener {
     func player(_ player: GKPlayer, receivedTurnEventFor match: GKTurnBasedMatch, didBecomeActive: Bool) {
+        if didBecomeActive {
+            matchmakerPresented = false
+        }
         if didBecomeActive || activeMatch?.matchID == match.matchID {
             incomingMatch = match
             activeMatch = match
