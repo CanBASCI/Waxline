@@ -210,3 +210,45 @@ struct BoardModelTests {
         #expect(board.phase == .place)
     }
 }
+
+struct MatchSnapshotTests {
+    @Test func encodesPlacementAndRotationForReplay() {
+        var board = BoardModel.empty()
+        #expect(board.place(at: Position(row: 1, col: 2)))
+        #expect(board.rotate(quadrant: .ne, clockwise: true))
+        let snapshot = MatchSnapshot.from(board)
+        #expect(snapshot.placeRow == 1)
+        #expect(snapshot.placeCol == 2)
+        #expect(snapshot.rotateQuadrant == Quadrant.ne.rawValue)
+        #expect(snapshot.rotateClockwise == true)
+        let restored = snapshot.toModel()
+        #expect(restored.lastPlacement == Position(row: 1, col: 2))
+        #expect(restored.lastRotation == LastRotation(quadrant: .ne, clockwise: true))
+        #expect(restored.cells == board.cells)
+    }
+
+    @Test func decodesLegacyPayloadWithoutMoveHints() throws {
+        let payload = """
+        {"version":1,"cells":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"currentPlayer":1,"phase":0,"winner":0,"winRows":[],"winCols":[]}
+        """
+        let data = try #require(payload.data(using: .utf8))
+        let snapshot = try #require(MatchSnapshot.decode(data))
+        let model = snapshot.toModel()
+        #expect(model.lastPlacement == nil)
+        #expect(model.lastRotation == nil)
+        #expect(model.currentPlayer == .red)
+        #expect(model.phase == .place)
+    }
+
+    @Test func encodesRematchVotesAndDeparture() {
+        var board = BoardModel.empty()
+        #expect(board.place(at: Position(row: 0, col: 0)))
+        let snapshot = MatchSnapshot.from(board, rematchRed: true, leftBy: .indigo)
+        #expect(snapshot.wantsRematchRed)
+        #expect(!snapshot.wantsRematchIndigo)
+        #expect(snapshot.departed == .indigo)
+        let restored = MatchSnapshot.decode(snapshot.encoded())
+        #expect(restored?.wantsRematchRed == true)
+        #expect(restored?.departed == .indigo)
+    }
+}

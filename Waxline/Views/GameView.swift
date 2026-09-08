@@ -7,10 +7,13 @@ struct GameView: View {
 
     @Environment(SettingsStore.self) private var settings
     @Environment(GameCenterService.self) private var gameCenter
+    @Environment(\.scenePhase) private var scenePhase
     @State private var scene = BoardSceneController()
     @State private var selectedQuadrant: Quadrant?
     @State private var busy = false
     @State private var showResult = false
+    @State private var confirmLeave = false
+    @State private var showInviteDeclined = false
     @State private var is3DView = false
     private var sakuraLook: SakuraLook {
         get { settings.sakuraLook }
@@ -21,6 +24,8 @@ struct GameView: View {
     }
     @State private var resultTask: Task<Void, Never>?
     @State private var timerTask: Task<Void, Never>?
+    @State private var remotePlaybackTask: Task<Void, Never>?
+    @State private var inviteWatchTask: Task<Void, Never>?
     @State private var turnSecondsLeft = 15
     @State private var canvasSize = CGSize(width: 390, height: 844)
     private var isCompactCanvas: Bool { canvasSize.height < 720 }
@@ -81,7 +86,21 @@ struct GameView: View {
             .ignoresSafeArea()
         }
         .preferredColorScheme(.dark)
-        .onAppear { configureScene() }
+        .onAppear {
+            configureScene()
+            startInviteWatchIfNeeded()
+        }
+        .onChange(of: waitingForOpponent) { _, _ in
+            startInviteWatchIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard waitingForOpponent else { return }
+            if phase == .background {
+                Task { await gameCenter.pulseWaitingHeartbeat(suspended: true) }
+            } else if phase == .active {
+                Task { await gameCenter.pulseWaitingHeartbeat(suspended: false) }
+            }
+        }
         .onChange(of: game.status) { oldStatus, newStatus in
             if oldStatus == .playing, newStatus != .playing {
                 game.recordSeriesResult(you: seriesYou)
@@ -101,15 +120,29 @@ struct GameView: View {
             }
         }
         .onChange(of: gameCenter.matchRevision) { _, _ in
-            reloadRemoteMatch()
+            remotePlaybackTask?.cancel()
+            remotePlaybackTask = Task { await applyRemoteMatch() }
         }
         .sheet(isPresented: $showResult) {
-            ResultSheet(game: game, seals: activeSeals, onAgain: replay, onMenu: onExit)
+            ResultSheet(game: game, seals: activeSeals, onAgain: replay, onMenu: leaveAndExit)
                 .environment(\.colorScheme, sakuraLook.colorScheme)
                 .preferredColorScheme(sakuraLook.colorScheme)
         }
+        .alert(t("gc_leave_title"), isPresented: $confirmLeave) {
+            Button(t("gc_leave_confirm"), role: .destructive, action: leaveAndExit)
+            Button(t("gc_cancel"), role: .cancel) {}
+        } message: {
+            Text(t("gc_leave_message"))
+        }
+        .alert(t("gc_invite_declined_title"), isPresented: $showInviteDeclined) {
+            Button(t("gc_invite_declined_ok"), action: leaveAfterDecline)
+        } message: {
+            Text(t("gc_invite_declined_message"))
+        }
         .onDisappear {
             resultTask?.cancel()
+            remotePlaybackTask?.cancel()
+            inviteWatchTask?.cancel()
             stopTurnTimer()
         }
     }
@@ -146,7 +179,7 @@ struct GameView: View {
 
     private var header: some View {
         HStack {
-            Button(action: onExit) {
+            Button(action: requestLeave) {
                 Text(t("menu"))
                     .font(bannerFont)
                     .foregroundStyle(hudChromeInk)
@@ -183,7 +216,7 @@ struct GameView: View {
                 Spacer(minLength: 8)
             }
             HStack(alignment: .center, spacing: 8) {
-                if game.status == .playing {
+                if game.status == .playing, !waitingForOpponent {
                     turnSteps
                 }
                 Spacer(minLength: 8)
@@ -313,6 +346,9 @@ struct GameView: View {
     }
 
     private var boardStatusText: String? {
+        if waitingForOpponent {
+            return t("gc_waiting_player")
+        }
         if canAct, !busy {
             if game.phase == .place {
                 return t("place_hint")
@@ -439,6 +475,9 @@ struct GameView: View {
     }
 
     private var turnTitle: String {
+        if waitingForOpponent {
+            return t("gc_waiting_player")
+        }
         if game.mode == .gameCenter {
             return isLocalTurn ? t("turn_you") : t("turn_waiting")
         }
@@ -495,8 +534,7 @@ struct GameView: View {
     }
 
     private var isLocalTurn: Bool {
-        guard let match = gameCenter.activeMatch else { return true }
-        return gameCenter.isLocalTurn(match)
+        gameCenter.isLocalTurn()
     }
 
     private var isHumanTurn: Bool {
@@ -505,9 +543,13 @@ struct GameView: View {
         case .ai:
             return game.currentPlayer == .red
         case .gameCenter:
-            guard let match = gameCenter.activeMatch else { return false }
-            return gameCenter.isLocalTurn(match) && game.currentPlayer == gameCenter.localPlayerColor(in: match)
+            if gameCenter.isWaitingForOpponent() { return false }
+            return gameCenter.isLocalTurn() && game.currentPlayer == gameCenter.localPlayerColor()
         }
+    }
+
+    private var waitingForOpponent: Bool {
+        game.mode == .gameCenter && gameCenter.isWaitingForOpponent()
     }
 
     private var canAct: Bool {
@@ -599,10 +641,10 @@ struct GameView: View {
     }
 
     private func finishTurnIfNeeded() {
-        if game.mode == .gameCenter, let match = gameCenter.activeMatch {
+        if game.mode == .gameCenter, gameCenter.hasActiveSession {
             let shouldSend = game.isFinished || game.phase == .place
             if shouldSend {
-                Task { await gameCenter.submitTurn(match: match, model: game.model) }
+                Task { await gameCenter.submitTurn(model: game.model) }
             }
         }
     }
@@ -618,16 +660,15 @@ struct GameView: View {
     }
 
     private var seriesYou: Player {
-        if game.mode == .gameCenter, let match = gameCenter.activeMatch {
-            return gameCenter.localPlayerColor(in: match)
+        if game.mode == .gameCenter {
+            return gameCenter.localPlayerColor()
         }
         return .red
     }
 
     private func replay() {
         if game.mode == .gameCenter {
-            onPreserveSeries()
-            gameCenter.presentMatchmaker()
+            Task { await gameCenter.requestRematch(currentModel: game.model) }
             return
         }
         showResult = false
@@ -641,13 +682,203 @@ struct GameView: View {
         beginNextTurnClock()
     }
 
-    private func reloadRemoteMatch() {
-        guard game.mode == .gameCenter, let match = gameCenter.activeMatch else { return }
-        game.replace(with: gameCenter.model(from: match))
+    private func requestLeave() {
+        if game.mode == .gameCenter {
+            confirmLeave = true
+            return
+        }
+        leaveAndExit()
+    }
+
+    private func leaveAndExit() {
+        if game.mode != .gameCenter {
+            onExit()
+            return
+        }
+        Task {
+            await gameCenter.leave(currentModel: game.model)
+            onExit()
+        }
+    }
+
+    private func applyRemoteMatch() async {
+        guard game.mode == .gameCenter, gameCenter.hasActiveSession else { return }
+        if gameCenter.inviteWasDeclined() {
+            handleInviteDeclined()
+            return
+        }
+        if gameCenter.opponentLeft() {
+            handleOpponentLeft()
+            return
+        }
+        if gameCenter.isWaitingForOpponent() {
+            stopTurnTimer()
+            refreshInteraction()
+            return
+        }
+        if gameCenter.bothWantRematch {
+            let incoming = gameCenter.boardModel()
+            if incoming.isFreshDeal {
+                beginLocalRematch(incoming)
+                return
+            }
+            if gameCenter.isLocalTurn() {
+                await gameCenter.commitRematchIfNeeded()
+            }
+            return
+        }
+        let incoming = gameCenter.boardModel()
+        if incoming.isFreshDeal, game.isFinished {
+            beginLocalRematch(incoming)
+            return
+        }
+        if incoming.cells == game.model.cells,
+           incoming.currentPlayer == game.model.currentPlayer,
+           incoming.phase == game.model.phase {
+            refreshInteraction()
+            if isHumanTurn {
+                beginNextTurnClock()
+            }
+            if incoming.status != .playing {
+                showResult = true
+            }
+            return
+        }
+        if canReplayRemote(incoming) {
+            await playRemoteTurn(incoming)
+            return
+        }
+        snapToRemote(incoming)
+    }
+
+    private func handleInviteDeclined() {
+        inviteWatchTask?.cancel()
+        stopTurnTimer()
+        busy = false
+        refreshInteraction()
+        showInviteDeclined = true
+    }
+
+    private func leaveAfterDecline() {
+        Task {
+            await gameCenter.leave(currentModel: game.model)
+            onExit()
+        }
+    }
+
+    private func startInviteWatchIfNeeded() {
+        let holdFreshSeat = gameCenter.activeMatch != nil
+            && game.status == .playing
+            && game.model.isFreshDeal
+        guard waitingForOpponent || holdFreshSeat else {
+            inviteWatchTask?.cancel()
+            inviteWatchTask = nil
+            return
+        }
+        guard inviteWatchTask == nil else { return }
+        inviteWatchTask = Task {
+            if waitingForOpponent {
+                await gameCenter.pulseWaitingHeartbeat()
+            }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled else { return }
+                if waitingForOpponent {
+                    await gameCenter.pulseWaitingHeartbeat()
+                }
+                await gameCenter.refreshActiveMatch()
+            }
+        }
+    }
+
+    private func handleOpponentLeft() {
+        if game.status == .playing {
+            game.recordForfeitWin()
+        }
+        stopTurnTimer()
+        busy = false
+        showResult = true
+    }
+
+    private func beginLocalRematch(_ incoming: BoardModel) {
+        resultTask?.cancel()
+        showResult = false
+        selectedQuadrant = nil
+        busy = false
+        game.replace(with: incoming)
+        scene.abandonTabletDrag()
+        scene.resetTabletOrientation()
+        scene.syncBoard(game.model, winningLine: nil)
+        refreshInteraction()
+        beginNextTurnClock()
+    }
+
+    private func canReplayRemote(_ incoming: BoardModel) -> Bool {
+        guard game.phase == .place, game.status == .playing else { return false }
+        guard let placement = incoming.lastPlacement else { return false }
+        guard game.model.cell(at: placement) == .empty else { return false }
+        if incoming.lastRotation != nil { return true }
+        return incoming.status != .playing
+    }
+
+    private func playRemoteTurn(_ incoming: BoardModel) async {
+        guard let placement = incoming.lastPlacement else {
+            snapToRemote(incoming)
+            return
+        }
+        scene.abandonTabletDrag()
+        busy = true
+        scene.setInteraction(canPlace: false, canSelectQuadrant: false)
+        stopTurnTimer()
+        try? await Task.sleep(for: .milliseconds(380))
+        if Task.isCancelled {
+            snapToRemote(incoming)
+            return
+        }
+        let placer = game.currentPlayer
+        _ = game.place(at: placement)
+        scene.dropSeal(at: placement, player: placer)
+        HapticsService.place(enabled: settings.hapticsEnabled)
+        SoundService.place(enabled: settings.soundEnabled)
+        if game.isFinished {
+            busy = false
+            return
+        }
+        guard let rotation = incoming.lastRotation else {
+            snapToRemote(incoming)
+            return
+        }
+        try? await Task.sleep(for: .milliseconds(420))
+        if Task.isCancelled {
+            snapToRemote(incoming)
+            return
+        }
+        var preview = game.model
+        _ = preview.rotate(quadrant: rotation.quadrant, clockwise: rotation.clockwise)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            scene.animateRotation(quadrant: rotation.quadrant, clockwise: rotation.clockwise, model: preview) {
+                _ = game.rotate(quadrant: rotation.quadrant, clockwise: rotation.clockwise)
+                continuation.resume()
+            }
+        }
+        HapticsService.rotate(enabled: settings.hapticsEnabled)
+        SoundService.rotate(enabled: settings.soundEnabled)
+        if game.model.cells != incoming.cells {
+            snapToRemote(incoming)
+            return
+        }
+        busy = false
+        refreshInteraction()
+        beginNextTurnClock()
+    }
+
+    private func snapToRemote(_ incoming: BoardModel) {
+        game.replace(with: incoming)
         scene.syncBoard(game.model, winningLine: {
             if case .won(_, let line) = game.status { return line }
             return nil
         }())
+        busy = false
         refreshInteraction()
         if isHumanTurn {
             if timerTask == nil {

@@ -38,11 +38,18 @@ extension SakuraLook {
 struct RootView: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(GameCenterService.self) private var gameCenter
+    @Environment(\.scenePhase) private var scenePhase
     @State private var game: GameState?
     @State private var sessionSeries = MatchSeries()
     @State private var showSettings = false
     @State private var showOnboarding = false
     @State private var menuIntro = MenuIntroPlayback()
+    @State private var showInvites = false
+    @State private var openMatchID: String?
+    @State private var pendingInviteMatch: GKTurnBasedMatch?
+    @State private var confirmSwitchInvite = false
+    @State private var showInviteUnavailable = false
+    @State private var isJoiningMatch = false
 
     var body: some View {
         @Bindable var gameCenter = gameCenter
@@ -56,19 +63,33 @@ struct RootView: View {
                     game: game,
                     onExit: {
                         sessionSeries = MatchSeries()
+                        openMatchID = nil
                         self.game = nil
                     },
                     onPreserveSeries: { sessionSeries = game.series }
                 )
-                .id(gameCenter.activeMatch?.matchID ?? "local")
+                .id(gameCenter.sessionKey)
             } else {
                 MenuView(
                     playback: menuIntro,
                     onAI: { start(.ai(settings.aiLevel)) },
-                    onGameCenter: { gameCenter.presentMatchmaker() },
+                    onGameCenter: { openMultiplayer() },
                     onSettings: { showSettings = true },
                     onHowToPlay: { showOnboarding = true }
                 )
+            }
+        }
+        .overlay {
+            if isJoiningMatch {
+                ZStack {
+                    Color.black.opacity(0.28)
+                        .ignoresSafeArea()
+                    ProgressView(t("gc_joining"))
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 18)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .allowsHitTesting(true)
             }
         }
         .onAppear {
@@ -93,6 +114,18 @@ struct RootView: View {
             }
             .preferredColorScheme(settings.sakuraLook.colorScheme)
         }
+        .sheet(isPresented: $showInvites) {
+            GameCenterInviteList(
+                onSelect: { invite in
+                    requestIncomingMatch(invite.match)
+                },
+                onNewMatch: {
+                    showInvites = false
+                    gameCenter.presentMatchmaker()
+                }
+            )
+            .preferredColorScheme(settings.sakuraLook.colorScheme)
+        }
         .background {
             if let controller = gameCenter.authViewController {
                 GameCenterAuthPresenter(viewController: controller)
@@ -107,16 +140,83 @@ struct RootView: View {
             }
         }
         .onChange(of: gameCenter.incomingMatch?.matchID) { _, _ in
-            if let match = gameCenter.incomingMatch, game == nil {
-                gameCenter.incomingMatch = nil
-                gameCenter.matchmakerPresented = false
-                openGameCenter(match)
+            guard let match = gameCenter.incomingMatch, match.status != .ended else { return }
+            requestIncomingMatch(match)
+        }
+        .onChange(of: gameCenter.liveSessionID) { _, id in
+            guard id != nil else { return }
+            joinLiveMatch()
+        }
+        .onChange(of: game == nil) { _, atMenu in
+            if atMenu {
+                Task { await gameCenter.refreshPendingInvites() }
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await gameCenter.refreshPendingInvites() }
+            }
+        }
+        .alert(t("gc_switch_title"), isPresented: $confirmSwitchInvite) {
+            Button(t("gc_switch_confirm"), role: .destructive) {
+                if let match = pendingInviteMatch {
+                    pendingInviteMatch = nil
+                    joinIncomingMatch(match)
+                }
+            }
+            Button(t("gc_cancel"), role: .cancel) {
+                pendingInviteMatch = nil
+            }
+        } message: {
+            Text(switchInviteMessage)
+        }
+        .alert(t("gc_invite_declined_title"), isPresented: $showInviteUnavailable) {
+            Button(t("gc_invite_declined_ok"), role: .cancel) {}
+        } message: {
+            Text(t("gc_invite_declined_message"))
+        }
+        .alert(t("gc_error_title"), isPresented: gcErrorPresented) {
+            Button(t("gc_invite_declined_ok"), role: .cancel) {
+                gameCenter.lastErrorMessage = nil
+            }
+        } message: {
+            Text(gameCenter.lastErrorMessage ?? "")
+        }
+    }
+
+    private var gcErrorPresented: Binding<Bool> {
+        Binding(
+            get: { gameCenter.lastErrorMessage != nil },
+            set: { if !$0 { gameCenter.lastErrorMessage = nil } }
+        )
+    }
+
+    private func t(_ key: String.LocalizationValue) -> String {
+        L10n.text(key, language: settings.language)
+    }
+
+    private var switchInviteMessage: String {
+        let name = pendingInviteMatch.map { GameCenterInvite.inviterName(in: $0) } ?? ""
+        if name.isEmpty {
+            return t("gc_switch_message")
+        }
+        return "\(name)\n\n\(t("gc_switch_message"))"
+    }
+
+    private func openMultiplayer() {
+        Task {
+            await gameCenter.refreshPendingInvites()
+            if gameCenter.pendingInviteCount > 0 {
+                showInvites = true
+            } else {
+                gameCenter.presentMatchmaker()
             }
         }
     }
 
     private func start(_ mode: GameMode) {
         menuIntro.setMenuVisible(false)
+        openMatchID = nil
         game = GameState(mode: mode)
     }
 
@@ -125,13 +225,70 @@ struct RootView: View {
         gameCenter.authenticate()
     }
 
-    private func openGameCenter(_ match: GKTurnBasedMatch) {
-        menuIntro.setMenuVisible(false)
-        gameCenter.attach(match: match)
-        game = GameState(
-            mode: .gameCenter,
-            model: gameCenter.model(from: match),
-            series: sessionSeries
-        )
+    private func requestIncomingMatch(_ match: GKTurnBasedMatch) {
+        gameCenter.incomingMatch = nil
+        gameCenter.matchmakerPresented = false
+        showInvites = false
+        if openMatchID == match.matchID {
+            return
+        }
+        if game?.mode == .gameCenter {
+            pendingInviteMatch = match
+            confirmSwitchInvite = true
+            return
+        }
+        joinIncomingMatch(match)
+    }
+
+    private func joinIncomingMatch(_ match: GKTurnBasedMatch) {
+        gameCenter.incomingMatch = nil
+        gameCenter.matchmakerPresented = false
+        showInvites = false
+        if openMatchID == match.matchID {
+            return
+        }
+        Task {
+            isJoiningMatch = true
+            if let current = game, current.mode == .gameCenter {
+                await gameCenter.leave(currentModel: current.model)
+            }
+            guard let live = await gameCenter.joinMatch(match) else {
+                isJoiningMatch = false
+                openMatchID = nil
+                showInviteUnavailable = true
+                return
+            }
+            sessionSeries = MatchSeries()
+            menuIntro.setMenuVisible(false)
+            openMatchID = live.matchID
+            game = GameState(
+                mode: .gameCenter,
+                model: gameCenter.model(from: live),
+                series: sessionSeries
+            )
+            isJoiningMatch = false
+        }
+    }
+
+    private func joinLiveMatch() {
+        guard let session = gameCenter.liveSessionID else { return }
+        showInvites = false
+        gameCenter.matchmakerPresented = false
+        if openMatchID == session { return }
+        Task {
+            isJoiningMatch = true
+            if let current = game, current.mode == .gameCenter, gameCenter.activeMatch != nil {
+                await gameCenter.leave(currentModel: current.model)
+            }
+            sessionSeries = MatchSeries()
+            menuIntro.setMenuVisible(false)
+            openMatchID = session
+            game = GameState(
+                mode: .gameCenter,
+                model: gameCenter.boardModel(),
+                series: sessionSeries
+            )
+            isJoiningMatch = false
+        }
     }
 }

@@ -8,8 +8,28 @@ struct MatchSnapshot: Codable, Equatable, Sendable {
     var winner: Int
     var winRows: [Int]
     var winCols: [Int]
+    var placeRow: Int?
+    var placeCol: Int?
+    var rotateQuadrant: Int?
+    var rotateClockwise: Bool?
+    var rematchRed: Bool?
+    var rematchIndigo: Bool?
+    var leftBy: Int?
+    var hostHeartbeat: Double?
+    var hostSuspended: Bool?
 
-    static func from(_ model: BoardModel) -> MatchSnapshot {
+    var wantsRematchRed: Bool { rematchRed ?? false }
+    var wantsRematchIndigo: Bool { rematchIndigo ?? false }
+    var departed: Player? { leftBy.flatMap(Player.init(rawValue:)) }
+
+    static func from(
+        _ model: BoardModel,
+        rematchRed: Bool = false,
+        rematchIndigo: Bool = false,
+        leftBy: Player? = nil,
+        hostHeartbeat: Double? = nil,
+        hostSuspended: Bool = false
+    ) -> MatchSnapshot {
         var cells: [UInt8] = []
         cells.reserveCapacity(36)
         for row in 0..<6 {
@@ -37,7 +57,16 @@ struct MatchSnapshot: Codable, Equatable, Sendable {
             phase: model.phase.rawValue,
             winner: winner,
             winRows: winRows,
-            winCols: winCols
+            winCols: winCols,
+            placeRow: model.lastPlacement?.row,
+            placeCol: model.lastPlacement?.col,
+            rotateQuadrant: model.lastRotation?.quadrant.rawValue,
+            rotateClockwise: model.lastRotation?.clockwise,
+            rematchRed: rematchRed,
+            rematchIndigo: rematchIndigo,
+            leftBy: leftBy?.rawValue,
+            hostHeartbeat: hostHeartbeat,
+            hostSuspended: hostSuspended ? true : nil
         )
     }
 
@@ -64,12 +93,25 @@ struct MatchSnapshot: Codable, Equatable, Sendable {
             status = WinChecker.status(of: grid)
         }
         let checked = status == .playing ? WinChecker.status(of: grid) : status
+        let placement: Position?
+        if let placeRow, let placeCol {
+            placement = Position(row: placeRow, col: placeCol)
+        } else {
+            placement = nil
+        }
+        let rotation: LastRotation?
+        if let rotateQuadrant, let quadrant = Quadrant(rawValue: rotateQuadrant), let rotateClockwise {
+            rotation = LastRotation(quadrant: quadrant, clockwise: rotateClockwise)
+        } else {
+            rotation = nil
+        }
         return BoardModel(
             cells: grid,
             currentPlayer: player,
             phase: turn,
             status: checked,
-            lastPlacement: nil
+            lastPlacement: placement,
+            lastRotation: rotation
         )
     }
 

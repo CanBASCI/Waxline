@@ -54,6 +54,10 @@ final class GameState {
         }
     }
 
+    func recordForfeitWin() {
+        series.you += 1
+    }
+
     func replace(with newModel: BoardModel) {
         model = newModel
     }

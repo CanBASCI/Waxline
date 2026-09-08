@@ -6,6 +6,14 @@ struct BoardModel: Sendable, Equatable {
     var phase: TurnPhase
     var status: GameStatus
     var lastPlacement: Position?
+    var lastRotation: LastRotation?
+
+    var isFreshDeal: Bool {
+        status == .playing
+            && phase == .place
+            && lastPlacement == nil
+            && cells.allSatisfy { row in row.allSatisfy { $0 == .empty } }
+    }
 
     static func empty() -> BoardModel {
         BoardModel(
@@ -13,7 +21,8 @@ struct BoardModel: Sendable, Equatable {
             currentPlayer: .red,
             phase: .place,
             status: .playing,
-            lastPlacement: nil
+            lastPlacement: nil,
+            lastRotation: nil
         )
     }
 
@@ -37,6 +46,7 @@ struct BoardModel: Sendable, Equatable {
         guard cells[position.row][position.col] == .empty else { return false }
         cells[position.row][position.col] = currentPlayer.cell
         lastPlacement = position
+        lastRotation = nil
         status = WinChecker.status(of: cells)
         if status == .playing {
             phase = .rotate
@@ -47,6 +57,7 @@ struct BoardModel: Sendable, Equatable {
     mutating func rotate(quadrant: Quadrant, clockwise: Bool) -> Bool {
         guard status == .playing, phase == .rotate else { return false }
         applyRotation(quadrant: quadrant, clockwise: clockwise)
+        lastRotation = LastRotation(quadrant: quadrant, clockwise: clockwise)
         status = WinChecker.status(of: cells)
         if status == .playing {
             phase = .place

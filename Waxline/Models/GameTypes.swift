@@ -34,6 +34,11 @@ enum TurnPhase: Int, Sendable, Codable, Equatable {
     case rotate = 1
 }
 
+struct LastRotation: Sendable, Codable, Equatable {
+    var quadrant: Quadrant
+    var clockwise: Bool
+}
+
 struct Position: Sendable, Codable, Equatable, Hashable {
     var row: Int
     var col: Int

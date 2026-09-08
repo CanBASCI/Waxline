@@ -45,12 +45,7 @@ struct MenuView: View {
                 VStack(alignment: .trailing, spacing: 14) {
                     textLink(t("menu_ai"), index: 0, action: onAI)
                     VStack(alignment: .trailing, spacing: 4) {
-                        textLink(
-                            t("menu_gamecenter"),
-                            index: 1,
-                            enabled: gameCenter.isAuthenticated,
-                            action: onGameCenter
-                        )
+                        gameCenterLink(index: 1)
                         Text(t("gc_sign_in"))
                             .font(.footnote)
                             .foregroundStyle(Theme.ink.opacity(0.55))
@@ -91,6 +86,9 @@ struct MenuView: View {
         .onAppear {
             lockBottomInset()
             if playback.didFinish { idle = true }
+            if gameCenter.isAuthenticated {
+                Task { await gameCenter.refreshPendingInvites() }
+            }
         }
         .onChange(of: playback.didFinish) { _, finished in
             guard finished else { return }
@@ -121,6 +119,27 @@ struct MenuView: View {
             .disabled(!enabled)
             .opacity(enabled ? 1 : 0.38)
             .menuLineMotion(revealed: playback.didFinish, idle: idle, index: index)
+    }
+
+    private func gameCenterLink(index: Int) -> some View {
+        Button(action: onGameCenter) {
+            HStack(spacing: 8) {
+                if gameCenter.pendingInviteCount > 0 {
+                    Text("\(gameCenter.pendingInviteCount)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, gameCenter.pendingInviteCount > 9 ? 5 : 0)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(Color.red, in: Capsule())
+                        .accessibilityLabel(t("gc_invites"))
+                }
+                Text(t("menu_gamecenter"))
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!gameCenter.isAuthenticated)
+        .opacity(gameCenter.isAuthenticated ? 1 : 0.38)
+        .menuLineMotion(revealed: playback.didFinish, idle: idle, index: index)
     }
 }
 
