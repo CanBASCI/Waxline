@@ -189,8 +189,8 @@ struct GameView: View {
                 Text(t("menu"))
                     .font(bannerFont)
                     .foregroundStyle(hudChromeInk)
-                    .padding(.horizontal, 12)
-                    .frame(height: 32)
+                    .padding(.horizontal, 13.5)
+                    .frame(height: hudChromeHeight)
                     .background(hudChromeFill, in: Capsule())
                     .overlay {
                         Capsule().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
@@ -219,16 +219,15 @@ struct GameView: View {
                     .font(turnTitleFont)
                     .foregroundStyle(overlayCopy)
                     .modifier(OverlayReadable())
-                Spacer(minLength: 8)
-                if showsOpponentIdentity {
-                    opponentPhotoMark
-                }
             }
             HStack(alignment: .center, spacing: 8) {
                 if game.status == .playing, !waitingForOpponent {
                     turnSteps
                 }
                 Spacer(minLength: 8)
+            }
+            if showsOpponentIdentity {
+                opponentIdentityMark
             }
         }
         .padding(.horizontal, 20)
@@ -240,6 +239,24 @@ struct GameView: View {
 
     private var showsOpponentIdentity: Bool {
         game.mode == .gameCenter
+    }
+
+    private var opponentIdentityMark: some View {
+        HStack(alignment: .center, spacing: 9) {
+            opponentPhotoMark
+            Text(gameCenter.opponentDisplayName)
+                .font(turnTitleFont)
+                .foregroundStyle(overlayCopy)
+                .modifier(OverlayReadable())
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .opacity(opponentPhotoDimmed ? opponentPhotoDimOpacity : 1)
+                .animation(.easeInOut(duration: 0.28), value: opponentPhotoDimmed)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(gameCenter.opponentDisplayName)
+        .accessibilityValue(opponentPhotoDimmed ? t("turn_you") : t("turn_waiting"))
     }
 
     private var opponentPhotoMark: some View {
@@ -255,7 +272,7 @@ struct GameView: View {
                     .foregroundStyle(overlayCopy.opacity(0.85))
             }
         }
-        .frame(width: 32, height: 32)
+        .frame(width: hudChromeHeight, height: hudChromeHeight)
         .clipShape(Circle())
         .grayscale(sakuraLook == .mono ? 1 : 0)
         .overlay {
@@ -270,8 +287,7 @@ struct GameView: View {
         }
         .opacity(opponentPhotoDimmed ? opponentPhotoDimOpacity : 1)
         .animation(.easeInOut(duration: 0.28), value: opponentPhotoDimmed)
-        .accessibilityLabel(gameCenter.opponentDisplayName)
-        .accessibilityValue(opponentPhotoDimmed ? t("turn_you") : t("turn_waiting"))
+        .accessibilityHidden(true)
     }
 
     private var opponentPhotoDimmed: Bool {
@@ -428,9 +444,9 @@ struct GameView: View {
             HapticsService.select(enabled: settings.hapticsEnabled)
         } label: {
             Image(systemName: is3DView ? "cube" : "square")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(hudChromeInk)
-                .frame(width: hudChromeWidth, height: hudChromeHeight)
+                .frame(width: meterChromeWidth, height: meterChromeHeight)
                 .background(hudChromeFill, in: Capsule())
                 .overlay {
                     Capsule().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
@@ -467,7 +483,7 @@ struct GameView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .frame(width: 32, height: 32)
+                .frame(width: hudChromeHeight, height: hudChromeHeight)
                 .overlay {
                     Circle().stroke(
                         sakuraLook == .color ? hudChromeFill : hudChromeInk.opacity(0.35),
@@ -492,12 +508,14 @@ struct GameView: View {
     private var hudChromeInk: Color {
         sakuraLook == .color ? Theme.waxCinnabar : Theme.cream
     }
-    private var bannerFont: Font { .system(.body, design: .serif).weight(.medium) }
+    private var bannerFont: Font { .system(size: 19, weight: .medium, design: .serif) }
     private var hudChromeWidth: CGFloat { 48 }
     private var hudChromeHeight: CGFloat { 36 }
+    private var meterChromeHeight: CGFloat { 32 }
+    private var meterChromeWidth: CGFloat { hudChromeWidth * meterChromeHeight / hudChromeHeight }
     private var turnTitleFont: Font { .system(size: 19.5, weight: .medium, design: .serif) }
     private var turnSealSize: CGFloat { 25 }
-    private var hudMeterFont: Font { .system(.title2, design: .serif).weight(.medium) }
+    private var hudMeterFont: Font { .system(size: 19.5, weight: .medium, design: .serif) }
     private var turnTimerColor: Color {
         if turnSecondsLeft <= 5 { return Theme.waxRed }
         return sakuraLook == .color ? Theme.ink : Theme.cream
@@ -547,7 +565,7 @@ struct GameView: View {
             .font(hudMeterFont)
             .monospacedDigit()
             .foregroundStyle(turnTimerColor)
-            .frame(width: hudChromeWidth, height: hudChromeHeight)
+            .frame(width: meterChromeWidth, height: meterChromeHeight)
             .background(hudChromeFill, in: Capsule())
             .overlay {
                 Capsule().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
@@ -576,7 +594,7 @@ struct GameView: View {
             .font(.system(size: 17, weight: .medium, design: .serif))
             .foregroundStyle(active ? onSeal : ink.opacity(0.55))
             .padding(.horizontal, 11.5)
-            .padding(.vertical, 6)
+            .frame(height: meterChromeHeight)
             .background(active ? currentColor : ink.opacity(0.16), in: Capsule())
             .overlay {
                 Capsule().stroke(ink.opacity(active ? 0.4 : 0.28), lineWidth: 1)
