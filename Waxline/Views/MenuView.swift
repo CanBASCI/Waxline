@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct MenuView: View {
     @Environment(SettingsStore.self) private var settings
@@ -14,13 +15,19 @@ struct MenuView: View {
         L10n.text(key, language: settings.language)
     }
 
+    private var titleIntroOffset: CGFloat {
+        playback.didFinish ? 0 : (1 - playback.progress) * 108
+    }
+
     private var menuFont: Font { .system(.body, design: .serif).weight(.medium) }
     private var menuLinkFont: Font { .system(size: 18, weight: .medium, design: .serif) }
     @State private var idle = false
+    @State private var lockedBottomInset: CGFloat = 34
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack {
             MenuSakuraBackdrop(playback: playback)
+                .ignoresSafeArea()
 
             VStack(alignment: .trailing, spacing: 18) {
                 VStack(alignment: .trailing, spacing: 8) {
@@ -29,10 +36,11 @@ struct MenuView: View {
                     Text(t("app_name"))
                         .font(.system(.title, design: .serif).weight(.semibold))
                         .foregroundStyle(Theme.ink)
-                        .offset(y: playback.didFinish ? 0 : (1 - playback.progress) * 108)
+                        .offset(y: titleIntroOffset)
                 }
                 .shadow(color: Color.white.opacity(0.75), radius: 8)
                 .opacity(playback.isReady ? 1 : 0)
+                .transaction { $0.animation = nil }
 
                 VStack(alignment: .trailing, spacing: 14) {
                     textLink(t("menu_ai"), index: 0, action: onAI)
@@ -43,12 +51,10 @@ struct MenuView: View {
                             enabled: gameCenter.isAuthenticated,
                             action: onGameCenter
                         )
-                        if !gameCenter.isAuthenticated {
-                            Text(t("gc_sign_in"))
-                                .font(.footnote)
-                                .foregroundStyle(Theme.ink.opacity(0.55))
-                                .opacity(playback.didFinish ? 1 : 0)
-                        }
+                        Text(t("gc_sign_in"))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.ink.opacity(0.55))
+                            .opacity(gameCenter.isAuthenticated || !playback.didFinish ? 0 : 1)
                     }
                     textLink(t("menu_how_to_play"), index: 2, action: onHowToPlay)
                     textLink(t("menu_settings"), index: 3, action: onSettings)
@@ -59,14 +65,12 @@ struct MenuView: View {
                 .allowsHitTesting(playback.didFinish)
             }
             .padding(.trailing, 22)
-            .padding(.bottom, 36)
-            .safeAreaPadding(.bottom)
-            .safeAreaPadding(.trailing)
+            .padding(.bottom, 36 + lockedBottomInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            .ignoresSafeArea(edges: .bottom)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .ignoresSafeArea()
-        .safeAreaInset(edge: .top, alignment: .trailing, spacing: 0) {
+        .overlay(alignment: .topTrailing) {
             if playback.isReady, !playback.didFinish {
                 Button(action: playback.skip) {
                     Text(t("onboarding_skip"))
@@ -80,9 +84,12 @@ struct MenuView: View {
                 .buttonStyle(.plain)
                 .padding(.trailing, 22)
                 .padding(.top, 8)
+                .safeAreaPadding(.top)
+                .transaction { $0.animation = nil }
             }
         }
         .onAppear {
+            lockBottomInset()
             if playback.didFinish { idle = true }
         }
         .onChange(of: playback.didFinish) { _, finished in
@@ -91,6 +98,15 @@ struct MenuView: View {
                 try? await Task.sleep(for: .milliseconds(800))
                 idle = true
             }
+        }
+    }
+
+    private func lockBottomInset() {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let window = scenes.flatMap(\.windows).first(where: \.isKeyWindow) ?? scenes.first?.windows.first
+        let inset = window?.safeAreaInsets.bottom ?? 0
+        if inset > 0 {
+            lockedBottomInset = inset
         }
     }
 
