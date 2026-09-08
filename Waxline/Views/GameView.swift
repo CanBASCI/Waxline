@@ -248,20 +248,29 @@ struct GameView: View {
 
     private var opponentIdentityMark: some View {
         HStack(alignment: .center, spacing: 9) {
-            opponentPhotoMark
-            Text(gameCenter.opponentDisplayName)
-                .font(turnTitleFont)
-                .foregroundStyle(overlayCopy)
-                .modifier(OverlayReadable())
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .opacity(opponentPhotoDimmed ? opponentPhotoDimOpacity : 1)
-                .animation(.easeInOut(duration: 0.28), value: opponentPhotoDimmed)
+            Button {
+                HapticsService.select(enabled: settings.hapticsEnabled)
+                gameCenter.presentOpponentProfile()
+            } label: {
+                HStack(alignment: .center, spacing: 9) {
+                    opponentPhotoMark
+                    Text(gameCenter.opponentDisplayName)
+                        .font(turnTitleFont)
+                        .foregroundStyle(overlayCopy)
+                        .modifier(OverlayReadable())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .opacity(opponentPhotoDimmed ? opponentPhotoDimOpacity : 1)
+                        .animation(.easeInOut(duration: 0.28), value: opponentPhotoDimmed)
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(gameCenter.opponentPlayer() == nil)
+            .accessibilityLabel(gameCenter.opponentDisplayName)
+            .accessibilityHint(t("gc_player_profile"))
+            .accessibilityValue(opponentPhotoDimmed ? t("turn_you") : t("turn_waiting"))
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(gameCenter.opponentDisplayName)
-        .accessibilityValue(opponentPhotoDimmed ? t("turn_you") : t("turn_waiting"))
     }
 
     private var opponentPhotoMark: some View {

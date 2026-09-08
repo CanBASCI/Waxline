@@ -101,11 +101,12 @@ final class GameCenterService: NSObject {
 
     func opponentPlayer() -> GKPlayer? {
         if let match = liveMatch {
-            return match.players.first
+            return match.players.first { !isLocalGameCenterPlayer($0) }
         }
         if let match = activeMatch {
-            let localID = GKLocalPlayer.local.gamePlayerID
-            return match.participants.first { $0.player?.gamePlayerID != localID }?.player
+            return match.participants
+                .compactMap(\.player)
+                .first { !isLocalGameCenterPlayer($0) }
         }
         return nil
     }
@@ -113,6 +114,37 @@ final class GameCenterService: NSObject {
     func loadOpponentPhoto() async -> UIImage? {
         guard let player = opponentPlayer() else { return nil }
         return try? await player.loadPhoto(for: .small)
+    }
+
+    func presentOpponentProfile() {
+        guard opponentPlayer() != nil else { return }
+        if GKAccessPoint.shared.isPresentingGameCenter { return }
+        Task { @MainActor in
+            guard let player = await resolvedOpponentForProfile() else { return }
+            if GKAccessPoint.shared.isPresentingGameCenter { return }
+            let access = GKAccessPoint.shared
+            access.parentWindow = topViewController()?.view.window
+            access.trigger(player: player) {}
+        }
+    }
+
+    func isLocalGameCenterPlayer(_ player: GKPlayer) -> Bool {
+        let local = GKLocalPlayer.local
+        if player == local { return true }
+        let playerIDs = Set([player.gamePlayerID, player.teamPlayerID].filter { !$0.isEmpty })
+        let localIDs = Set([local.gamePlayerID, local.teamPlayerID].filter { !$0.isEmpty })
+        return !playerIDs.isEmpty && !playerIDs.isDisjoint(with: localIDs)
+    }
+
+    func resolvedOpponentForProfile() async -> GKPlayer? {
+        guard let player = opponentPlayer(), !isLocalGameCenterPlayer(player) else { return nil }
+        let identifiers = [player.teamPlayerID, player.gamePlayerID].filter { !$0.isEmpty }
+        if !identifiers.isEmpty,
+           let friends = try? await GKLocalPlayer.local.loadFriends(identifiedBy: identifiers),
+           let friend = friends.first(where: { !isLocalGameCenterPlayer($0) }) {
+            return friend
+        }
+        return player
     }
 
     func authenticate() {
