@@ -26,7 +26,7 @@ struct GameView: View {
     private var isCompactCanvas: Bool { canvasSize.height < 720 }
     private var boardGutter: CGFloat { isCompactCanvas ? 16 : 30 }
     private var footerSlotHeight: CGFloat { isCompactCanvas ? 88 : 108 }
-    private var overlayTypeSize: CGFloat { isCompactCanvas ? 14 : 16 }
+    private var overlayTypeSize: CGFloat { 18 }
     private var sakuraBoardSide: CGFloat {
         let chrome: CGFloat = 12 + 32
             + boardGutter + 68 + 8
@@ -118,7 +118,7 @@ struct GameView: View {
         VStack(spacing: 0) {
             header
             turnBanner
-            Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             HStack(alignment: .center, spacing: 8) {
                 turnTimer
                 Spacer(minLength: 8)
@@ -172,12 +172,12 @@ struct GameView: View {
     }
 
     private var turnBanner: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .center, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 9) {
                 SealMark(color: currentColor, motif: sealMotif, outline: sealOutline)
-                    .frame(width: 22, height: 22)
+                    .frame(width: turnSealSize, height: turnSealSize)
                 Text(turnTitle)
-                    .font(bannerFont)
+                    .font(turnTitleFont)
                     .foregroundStyle(overlayCopy)
                     .modifier(OverlayReadable())
                 Spacer(minLength: 8)
@@ -339,15 +339,13 @@ struct GameView: View {
             Image(systemName: is3DView ? "cube" : "square")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(hudChromeInk)
-                .frame(minWidth: 28)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+                .frame(width: hudChromeWidth, height: hudChromeHeight)
                 .background(hudChromeFill, in: Capsule())
                 .overlay {
                     Capsule().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
                 }
                 .shadow(color: textHalo, radius: 8)
-                .contentTransition(.symbolEffect(.replace))
+                .contentTransition(.symbolEffect(.replace, options: .speed(0.4 / 0.2)))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(is3DView ? t("view_3d") : t("view_2d"))
@@ -404,6 +402,10 @@ struct GameView: View {
         sakuraLook == .color ? Theme.waxCinnabar : Theme.cream
     }
     private var bannerFont: Font { .system(.body, design: .serif).weight(.medium) }
+    private var hudChromeWidth: CGFloat { 48 }
+    private var hudChromeHeight: CGFloat { 36 }
+    private var turnTitleFont: Font { .system(size: 19.5, weight: .medium, design: .serif) }
+    private var turnSealSize: CGFloat { 25 }
     private var hudMeterFont: Font { .system(.title2, design: .serif).weight(.medium) }
     private var turnTimerColor: Color {
         if turnSecondsLeft <= 5 { return Theme.waxRed }
@@ -451,9 +453,7 @@ struct GameView: View {
             .font(hudMeterFont)
             .monospacedDigit()
             .foregroundStyle(turnTimerColor)
-            .frame(minWidth: 28, alignment: .center)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
+            .frame(width: hudChromeWidth, height: hudChromeHeight)
             .background(hudChromeFill, in: Capsule())
             .overlay {
                 Capsule().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
@@ -467,10 +467,10 @@ struct GameView: View {
     }
 
     private var turnSteps: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 9) {
             stepChip(t("step_place"), active: game.phase == .place)
             Image(systemName: "arrow.right")
-                .font(.system(.subheadline, design: .serif).weight(.medium))
+                .font(.system(size: 17, weight: .medium, design: .serif))
                 .foregroundStyle(ink.opacity(0.35))
             stepChip(t("step_rotate"), active: game.phase == .rotate)
         }
@@ -479,11 +479,14 @@ struct GameView: View {
 
     private func stepChip(_ title: String, active: Bool) -> some View {
         Text(title)
-            .font(.system(.subheadline, design: .serif).weight(.medium))
+            .font(.system(size: 17, weight: .medium, design: .serif))
             .foregroundStyle(active ? onSeal : ink.opacity(0.55))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 11.5)
+            .padding(.vertical, 6)
             .background(active ? currentColor : ink.opacity(0.16), in: Capsule())
+            .overlay {
+                Capsule().stroke(ink.opacity(active ? 0.4 : 0.28), lineWidth: 1)
+            }
     }
 
     private var isAIThinking: Bool {
