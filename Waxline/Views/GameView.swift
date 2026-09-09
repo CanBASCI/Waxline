@@ -261,7 +261,7 @@ struct GameView: View {
         .padding(.top, boardGutter)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .shadow(color: textHalo, radius: 8)
+        .shadow(color: usesHUDGlass ? .clear : textHalo, radius: 8)
     }
 
     private var showsOpponentIdentity: Bool {
@@ -274,7 +274,7 @@ struct GameView: View {
             Text(gameCenter.opponentDisplayName)
                 .font(turnTitleFont)
                 .foregroundStyle(overlayCopy)
-                .modifier(OverlayReadable())
+                .modifier(OverlayReadable(enabled: !usesHUDGlass))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .opacity(opponentPhotoDimmed ? opponentPhotoDimOpacity : 1)
@@ -1186,11 +1186,17 @@ struct GameView: View {
 }
 
 private struct OverlayReadable: ViewModifier {
+    var enabled: Bool = true
+
     func body(content: Content) -> some View {
-        content
-            .shadow(color: .black.opacity(0.95), radius: 0, y: 1)
-            .shadow(color: .black.opacity(0.8), radius: 3)
-            .shadow(color: .black.opacity(0.45), radius: 8)
+        if enabled {
+            content
+                .shadow(color: .black.opacity(0.95), radius: 0, y: 1)
+                .shadow(color: .black.opacity(0.8), radius: 3)
+                .shadow(color: .black.opacity(0.45), radius: 8)
+        } else {
+            content
+        }
     }
 }
 
