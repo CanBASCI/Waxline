@@ -9,6 +9,7 @@ struct MenuView: View {
     var onGameCenter: () -> Void
     var onSettings: () -> Void
     var onHowToPlay: () -> Void
+    var onMoreApps: () -> Void
 
     private func t(_ key: String.LocalizationValue) -> String {
         L10n.text(key, language: settings.language)
@@ -44,13 +45,15 @@ struct MenuView: View {
                     textLink(t("menu_ai"), index: 0, action: onAI)
                     VStack(alignment: .trailing, spacing: 4) {
                         gameCenterLink(index: 1)
-                        Text(t("gc_sign_in"))
-                            .font(.footnote)
-                            .foregroundStyle(Theme.ink.opacity(0.55))
-                            .opacity(gameCenter.isAuthenticated || !playback.didFinish ? 0 : 1)
+                        if !gameCenter.isAuthenticated, playback.didFinish {
+                            Text(t("gc_sign_in"))
+                                .font(.footnote)
+                                .foregroundStyle(Theme.ink.opacity(0.55))
+                        }
                     }
                     textLink(t("menu_how_to_play"), index: 2, action: onHowToPlay)
                     textLink(t("menu_settings"), index: 3, action: onSettings)
+                    textLink(t("menu_more_apps"), index: 4, action: onMoreApps)
                 }
                 .font(menuLinkFont)
                 .foregroundStyle(Theme.ink)

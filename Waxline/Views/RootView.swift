@@ -49,6 +49,7 @@ struct RootView: View {
     @State private var sessionSeries = MatchSeries()
     @State private var showSettings = false
     @State private var showOnboarding = false
+    @State private var showMoreApps = false
     @State private var menuIntro = MenuIntroPlayback()
     @State private var showInvites = false
     @State private var openMatchID: String?
@@ -62,6 +63,7 @@ struct RootView: View {
         let menuForeground = game == nil
             && !showOnboarding
             && !showSettings
+            && !showMoreApps
             && !gameCenter.matchmakerPresented
         ZStack {
             if let game {
@@ -81,7 +83,8 @@ struct RootView: View {
                     onAI: { start(.ai(settings.aiLevel)) },
                     onGameCenter: { openMultiplayer() },
                     onSettings: { showSettings = true },
-                    onHowToPlay: { showOnboarding = true }
+                    onHowToPlay: { showOnboarding = true },
+                    onMoreApps: { showMoreApps = true }
                 )
             }
         }
@@ -111,6 +114,9 @@ struct RootView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .preferredColorScheme(settings.sakuraLook.colorScheme)
+        }
+        .sheet(isPresented: $showMoreApps) {
+            MoreAppsSheet()
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingView {
