@@ -190,26 +190,45 @@ struct SealMark: View {
     var motif: Color = Theme.gold
     var outline: Color? = nil
     var outlineWidth: CGFloat? = nil
+    var glass: Bool = false
 
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
+            let shape = RoundedRectangle(cornerRadius: side * 0.28, style: .continuous)
             ZStack {
-                RoundedRectangle(cornerRadius: side * 0.28, style: .continuous)
-                    .fill(color)
-                    .shadow(color: color.opacity(side > 40 ? 0.35 : 0.2), radius: side * 0.12, y: side * 0.08)
-                    .overlay {
-                        if let outline {
-                            RoundedRectangle(cornerRadius: side * 0.28, style: .continuous)
-                                .stroke(outline, lineWidth: outlineWidth ?? max(1, side * 0.05))
+                if glass {
+                    glassPlate(side: side, shape: shape)
+                } else {
+                    shape
+                        .fill(color)
+                        .shadow(color: color.opacity(side > 40 ? 0.35 : 0.2), radius: side * 0.12, y: side * 0.08)
+                        .overlay {
+                            if let outline {
+                                shape.stroke(outline, lineWidth: outlineWidth ?? max(1, side * 0.05))
+                            }
                         }
-                    }
+                }
                 SealStar()
                     .fill(motif)
                     .frame(width: side * 0.71, height: side * 0.71)
             }
+            .frame(width: side, height: side)
         }
         .aspectRatio(1, contentMode: .fit)
+    }
+
+    @ViewBuilder
+    private func glassPlate(side: CGFloat, shape: RoundedRectangle) -> some View {
+        if #available(iOS 26.0, *) {
+            Color.clear
+                .frame(width: side, height: side)
+                .glassEffect(.regular.tint(color), in: shape)
+        } else {
+            shape
+                .fill(.ultraThinMaterial)
+                .overlay(shape.fill(color.opacity(0.42)))
+        }
     }
 }
 
@@ -220,6 +239,7 @@ struct SeriesScoreRow: View {
     var sealSize: CGFloat
     var numberColor: Color
     var sealStroke: Color = Color(white: 0.96).opacity(0.4)
+    var glass: Bool = false
 
     var body: some View {
         HStack(spacing: sealSize * 0.45) {
@@ -249,8 +269,9 @@ struct SeriesScoreRow: View {
             SealMark(
                 color: player.map { Theme.seal($0, palette: seals) } ?? Theme.gold,
                 motif: motif(for: player),
-                outline: sealStroke,
-                outlineWidth: 1
+                outline: glass ? nil : sealStroke,
+                outlineWidth: 1,
+                glass: glass
             )
             .frame(width: sealSize, height: sealSize)
             Text("\(count)")

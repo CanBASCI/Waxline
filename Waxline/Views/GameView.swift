@@ -22,7 +22,11 @@ struct GameView: View {
         nonmutating set { settings.sakuraLook = newValue }
     }
     private var sakuraTablet: SakuraTabletTheme {
-        sakuraLook == .color ? .blossom : .charcoal
+        switch sakuraLook {
+        case .color: .blossom
+        case .mono: .charcoal
+        case .neon: .neon
+        }
     }
     @State private var resultTask: Task<Void, Never>?
     @State private var timerTask: Task<Void, Never>?
@@ -70,7 +74,7 @@ struct GameView: View {
         .background {
             ZStack(alignment: .bottom) {
                 GameLoopBackdrop(
-                    resource: sakuraLook == .color ? "gameplaycolorfulbackgroundvideo" : "gamescreensakuravideo_2",
+                    resource: backdropResource,
                     ext: "mov"
                 )
                 .id(sakuraLook)
@@ -176,6 +180,7 @@ struct GameView: View {
                 Spacer(minLength: 8)
                 perspectiveChip
             }
+            .hudGlassCluster(enabled: usesHUDGlass)
             .padding(.horizontal, 20)
             .padding(.bottom, 8)
             BoardSceneView(controller: scene)
@@ -202,22 +207,24 @@ struct GameView: View {
             Button(action: requestLeave) {
                 Text(t("menu"))
                     .font(bannerFont)
-                    .foregroundStyle(hudChromeInk)
+                    .foregroundStyle(hudLabelInk)
                     .padding(.horizontal, 13.5)
                     .frame(height: hudChromeHeight)
-                    .background(hudChromeFill, in: Capsule())
-                    .overlay {
-                        Capsule().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
-                    }
-                    .shadow(color: textHalo, radius: 8)
+                    .hudChrome(
+                        glass: usesHUDGlass,
+                        fill: hudChromeFill,
+                        stroke: hudChromeInk.opacity(0.35)
+                    )
+                    .shadow(color: usesHUDGlass ? .clear : textHalo, radius: 8)
             }
             .buttonStyle(.plain)
             .animation(.easeInOut(duration: 0.22), value: sakuraLook)
             Spacer(minLength: 8)
             lookToggle
-                .shadow(color: textHalo, radius: 8)
+                .shadow(color: usesHUDGlass ? .clear : textHalo, radius: 8)
                 .animation(.easeInOut(duration: 0.22), value: sakuraLook)
         }
+        .hudGlassCluster(enabled: usesHUDGlass)
         .zIndex(1)
         .padding(.horizontal, 20)
         .padding(.top, 12)
@@ -230,13 +237,14 @@ struct GameView: View {
                 SealMark(
                     color: currentColor,
                     motif: sealMotif,
-                    outline: hudStepStroke(active: true),
-                    outlineWidth: 1
+                    outline: usesHUDGlass ? nil : hudStepStroke(active: true),
+                    outlineWidth: 1,
+                    glass: usesHUDGlass
                 )
                 .frame(width: turnSealSize, height: turnSealSize)
                 Text(turnTitle)
                     .font(turnTitleFont)
-                    .foregroundStyle(overlayCopy)
+                    .foregroundStyle(turnTitleColor)
                     .modifier(OverlayReadable())
             }
             HStack(alignment: .center, spacing: 8) {
@@ -355,7 +363,8 @@ struct GameView: View {
                 you: seriesYou,
                 sealSize: seriesSealSize,
                 numberColor: overlayCopy,
-                sealStroke: hudStepStroke(active: true)
+                sealStroke: hudStepStroke(active: true),
+                glass: usesHUDGlass
             )
             .fixedSize(horizontal: true, vertical: true)
             .frame(maxWidth: seriesMaxWidth, alignment: .leading)
@@ -402,8 +411,9 @@ struct GameView: View {
                 SealMark(
                     color: Theme.seal(player, palette: activeSeals),
                     motif: reserveMotif(player),
-                    outline: stackEdge(for: player),
-                    outlineWidth: 1.2 * sealScale
+                    outline: usesHUDGlass ? nil : stackEdge(for: player),
+                    outlineWidth: 1.2 * sealScale,
+                    glass: usesHUDGlass && index == count - 1
                 )
                 .frame(width: size, height: size)
                 .offset(y: -CGFloat(index) * step)
@@ -465,13 +475,15 @@ struct GameView: View {
         } label: {
             Image(systemName: is3DView ? "cube" : "square")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(hudChromeInk)
+                .foregroundStyle(usesHUDGlass ? meterGlassInk : hudLabelInk)
                 .frame(width: meterChromeWidth, height: meterChromeHeight)
-                .background(hudChromeFill, in: Capsule())
-                .overlay {
-                    Capsule().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
-                }
-                .shadow(color: textHalo, radius: 8)
+                .hudChrome(
+                    glass: usesHUDGlass,
+                    fill: hudChromeFill,
+                    stroke: hudChromeInk.opacity(0.35),
+                    dark: usesHUDGlass
+                )
+                .shadow(color: usesHUDGlass ? .clear : textHalo, radius: 8)
                 .contentTransition(.symbolEffect(.replace, options: .speed(0.4 / 0.2)))
         }
         .buttonStyle(.plain)
@@ -488,49 +500,107 @@ struct GameView: View {
             Circle()
                 .fill(
                     LinearGradient(
-                        stops: sakuraLook == .mono
-                            ? [
-                                .init(color: .black, location: 0),
-                                .init(color: .black, location: 0.16),
-                                .init(color: .white, location: 0.84),
-                                .init(color: .white, location: 1)
-                            ]
-                            : [
-                                .init(color: Theme.waxCinnabar, location: 0),
-                                .init(color: Theme.waxDusk, location: 1)
-                            ],
+                        stops: lookToggleStops,
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
+                .frame(width: lookToggleInner, height: lookToggleInner)
                 .frame(width: hudChromeHeight, height: hudChromeHeight)
-                .overlay {
-                    Circle().stroke(
-                        sakuraLook == .color ? hudChromeFill : hudChromeInk.opacity(0.35),
-                        lineWidth: 1
-                    )
-                }
+                .hudChrome(
+                    glass: usesHUDGlass,
+                    fill: .clear,
+                    stroke: lookToggleStroke,
+                    shape: .circle
+                )
         }
         .buttonStyle(.plain)
         .accessibilityLabel(t("look_settings"))
-        .accessibilityValue(t(sakuraLook == .mono ? "sakura_look_mono" : "sakura_look_color"))
+        .accessibilityValue(lookAccessibilityValue)
+    }
+
+    private var lookToggleInner: CGFloat {
+        usesHUDGlass ? hudChromeHeight - 6 : hudChromeHeight
+    }
+
+    private var lookToggleStops: [Gradient.Stop] {
+        switch sakuraLook {
+        case .mono:
+            [
+                .init(color: .black, location: 0),
+                .init(color: .black, location: 0.16),
+                .init(color: .white, location: 0.84),
+                .init(color: .white, location: 1)
+            ]
+        case .color:
+            [
+                .init(color: Theme.waxCinnabar, location: 0),
+                .init(color: Theme.waxDusk, location: 1)
+            ]
+        case .neon:
+            [
+                .init(color: Theme.waxMagenta, location: 0),
+                .init(color: Theme.waxCyan, location: 1)
+            ]
+        }
+    }
+
+    private var lookToggleStroke: Color {
+        sakuraLook == .color ? hudChromeFill : hudChromeInk.opacity(0.35)
+    }
+
+    private var lookAccessibilityValue: String {
+        switch sakuraLook {
+        case .color: t("sakura_look_color")
+        case .mono: t("sakura_look_mono")
+        case .neon: t("sakura_look_neon")
+        }
     }
 
     private var backdropExpanded: Bool {
         is3DView || abs(tilt.x) > 0.002 || abs(tilt.y) > 0.002
     }
 
-    private var activeSeals: SealPalette { sakuraLook == .mono ? .mono : .classic }
+    private var backdropResource: String {
+        switch sakuraLook {
+        case .color: "gameplaycolorfulbackgroundvideo"
+        case .mono: "gamescreensakuravideo_2"
+        case .neon: "gameplay_neon_video"
+        }
+    }
+
+    private var usesHUDGlass: Bool { sakuraLook == .neon }
+
+    private var activeSeals: SealPalette {
+        switch sakuraLook {
+        case .mono: .mono
+        case .color: .classic
+        case .neon: .neon
+        }
+    }
     private var ink: Color { Color(white: 0.96) }
     private var boardInk: Color { ink }
     private var textHalo: Color { Color.black.opacity(0.55) }
     private var overlayHalo: Color { Color.black.opacity(0.55) }
-    private var overlayCopy: Color { Theme.ink(dark: true) }
+    private var overlayCopy: Color {
+        usesHUDGlass
+            ? Color(red: 0.78, green: 0.94, blue: 1.0)
+            : Theme.ink(dark: true)
+    }
+    private var turnTitleColor: Color {
+        usesHUDGlass ? currentColor : overlayCopy
+    }
     private var hudChromeFill: Color {
         sakuraLook == .color ? Theme.cream : Theme.waxBlack
     }
     private var hudChromeInk: Color {
         sakuraLook == .color ? Theme.waxCinnabar : Theme.cream
+    }
+    private var hudLabelInk: Color {
+        usesHUDGlass ? Color.primary : hudChromeInk
+    }
+    private var meterGlassInk: Color {
+        Theme.ink(dark: true)
     }
     private var bannerFont: Font { .system(size: 19, weight: .medium, design: .serif) }
     private var hudChromeWidth: CGFloat { 48 }
@@ -545,6 +615,7 @@ struct GameView: View {
     }
     private var turnTimerColor: Color {
         if turnSecondsLeft <= 5 { return Theme.waxRed }
+        if usesHUDGlass { return meterGlassInk }
         return sakuraLook == .color ? Theme.ink : Theme.cream
     }
 
@@ -555,6 +626,9 @@ struct GameView: View {
     private var onSeal: Color {
         if activeSeals == .mono, game.currentPlayer == .indigo {
             return Theme.ink
+        }
+        if activeSeals == .neon, game.currentPlayer == .indigo {
+            return Theme.waxNavy
         }
         return Theme.cream
     }
@@ -576,6 +650,9 @@ struct GameView: View {
         if activeSeals == .mono {
             return game.currentPlayer == .red ? t("turn_black") : t("turn_white")
         }
+        if activeSeals == .neon {
+            return game.currentPlayer == .red ? t("turn_magenta") : t("turn_cyan")
+        }
         return game.currentPlayer == .red ? t("turn_red") : t("turn_indigo")
     }
 
@@ -585,11 +662,13 @@ struct GameView: View {
             .monospacedDigit()
             .foregroundStyle(turnTimerColor)
             .frame(width: meterChromeWidth, height: meterChromeHeight)
-            .background(hudChromeFill, in: Capsule())
-            .overlay {
-                Capsule().stroke(hudChromeInk.opacity(0.35), lineWidth: 1)
-            }
-            .shadow(color: textHalo, radius: 8)
+            .hudChrome(
+                glass: usesHUDGlass,
+                fill: hudChromeFill,
+                stroke: hudChromeInk.opacity(0.35),
+                dark: usesHUDGlass
+            )
+            .shadow(color: usesHUDGlass ? .clear : textHalo, radius: 8)
             .opacity(isHumanTurn && turnSecondsLeft > 0 ? 1 : 0)
             .animation(.easeInOut(duration: 0.18), value: turnSecondsLeft)
             .accessibilityLabel(t("turn_timer"))
@@ -605,19 +684,30 @@ struct GameView: View {
                 .foregroundStyle(ink.opacity(0.35))
             stepChip(t("step_rotate"), active: game.phase == .rotate)
         }
+        .hudGlassCluster(enabled: usesHUDGlass)
         .animation(.easeInOut(duration: 0.28), value: game.phase)
+    }
+
+    private func stepChipInk(active: Bool) -> Color {
+        if usesHUDGlass {
+            return active ? onSeal : overlayCopy.opacity(0.72)
+        }
+        return active ? onSeal : ink.opacity(0.55)
     }
 
     private func stepChip(_ title: String, active: Bool) -> some View {
         Text(title)
             .font(.system(size: 17, weight: .medium, design: .serif))
-            .foregroundStyle(active ? onSeal : ink.opacity(0.55))
+            .foregroundStyle(stepChipInk(active: active))
             .padding(.horizontal, 11.5)
             .frame(height: meterChromeHeight)
-            .background(active ? currentColor : ink.opacity(0.16), in: Capsule())
-            .overlay {
-                Capsule().stroke(hudStepStroke(active: active), lineWidth: 1)
-            }
+            .hudChrome(
+                glass: usesHUDGlass,
+                fill: active ? currentColor : ink.opacity(0.16),
+                stroke: hudStepStroke(active: active),
+                tint: usesHUDGlass && active ? currentColor : nil,
+                dark: usesHUDGlass && !active
+            )
     }
 
     private var isAIThinking: Bool {

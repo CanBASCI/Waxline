@@ -92,6 +92,9 @@ struct ResultSheet: View {
             if seals == .mono {
                 return player == .red ? t("black_wins") : t("white_wins")
             }
+            if seals == .neon {
+                return player == .red ? t("magenta_wins") : t("cyan_wins")
+            }
             return player == .red ? t("red_wins") : t("indigo_wins")
         }
     }

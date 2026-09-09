@@ -70,6 +70,7 @@ struct MatchSeries: Equatable, Sendable {
 enum SakuraLook: String, Sendable, CaseIterable {
     case color
     case mono
+    case neon
 }
 
 enum AILevel: String, Sendable, Codable, CaseIterable, Identifiable {
@@ -99,16 +100,19 @@ enum LanguageOverride: String, Sendable, Codable, CaseIterable, Identifiable {
 enum SealPalette: String, Sendable, Codable, CaseIterable {
     case classic
     case mono
+    case neon
 }
 
 enum SakuraTabletTheme: String, Sendable {
     case charcoal
     case blossom
+    case neon
 
     var colorResource: String {
         switch self {
         case .charcoal: "sakura_tablet_charcoal_color"
         case .blossom: "sakura_tablet_blossom_color"
+        case .neon: "sakura_tablet_neon_color"
         }
     }
 }

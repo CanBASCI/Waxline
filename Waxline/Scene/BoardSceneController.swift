@@ -237,7 +237,6 @@ final class BoardSceneController: NSObject {
         scnView?.layer.isOpaque = false
         applyLighting()
         scene.lightingEnvironment.contents = PaperStyle.sakuraLightingCube()
-        scene.lightingEnvironment.intensity = 0.38
         if previousTablet != tablet {
             SCNTransaction.begin()
             SCNTransaction.animationDuration = 0
@@ -271,12 +270,23 @@ final class BoardSceneController: NSObject {
     }
 
     private func applyLighting() {
-        ambientLightNode.light?.color = UIColor(red: 0.62, green: 0.60, blue: 0.66, alpha: 1)
-        ambientLightNode.light?.intensity = 320
-        sunLightNode.light?.color = UIColor(red: 0.82, green: 0.80, blue: 0.86, alpha: 1)
-        sunLightNode.light?.intensity = 420
-        fillLightNode.light?.color = UIColor(red: 0.55, green: 0.50, blue: 0.62, alpha: 1)
-        fillLightNode.light?.intensity = 180
+        if tabletTheme == .neon {
+            ambientLightNode.light?.color = UIColor(red: 0.38, green: 0.22, blue: 0.48, alpha: 1)
+            ambientLightNode.light?.intensity = 300
+            sunLightNode.light?.color = UIColor(red: 0.55, green: 0.90, blue: 1.00, alpha: 1)
+            sunLightNode.light?.intensity = 560
+            fillLightNode.light?.color = UIColor(red: 0.95, green: 0.22, blue: 0.58, alpha: 1)
+            fillLightNode.light?.intensity = 260
+            scene.lightingEnvironment.intensity = 0.52
+        } else {
+            ambientLightNode.light?.color = UIColor(red: 0.62, green: 0.60, blue: 0.66, alpha: 1)
+            ambientLightNode.light?.intensity = 320
+            sunLightNode.light?.color = UIColor(red: 0.82, green: 0.80, blue: 0.86, alpha: 1)
+            sunLightNode.light?.intensity = 420
+            fillLightNode.light?.color = UIColor(red: 0.55, green: 0.50, blue: 0.62, alpha: 1)
+            fillLightNode.light?.intensity = 180
+            scene.lightingEnvironment.intensity = 0.38
+        }
         sunLightNode.light?.castsShadow = false
     }
 
@@ -857,6 +867,8 @@ final class BoardSceneController: NSObject {
         let material = PaperStyle.waxMaterial(color: color)
         if glow {
             material.emission.contents = color.withAlphaComponent(0.9)
+        } else if sealPalette == .neon {
+            material.emission.contents = color.withAlphaComponent(0.34)
         }
         box.materials = [material]
         let node = SCNNode(geometry: box)
@@ -867,6 +879,8 @@ final class BoardSceneController: NSObject {
         motifMat.roughness.contents = 0.28
         if glow {
             motifMat.emission.contents = motifColor.withAlphaComponent(0.85)
+        } else if sealPalette == .neon {
+            motifMat.emission.contents = motifColor.withAlphaComponent(0.28)
         }
         motif.materials = [motifMat]
         let motifNode = SCNNode(geometry: motif)

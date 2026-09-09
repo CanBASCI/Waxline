@@ -25,7 +25,7 @@ struct SheetActionButton: View {
         .disabled(!enabled)
     }
 
-    private var sheetDark: Bool { settings.sakuraLook == .mono }
+    private var sheetDark: Bool { settings.sakuraLook != .color }
 
     private var prominentFill: Color {
         sheetDark ? Color.white.opacity(0.16) : Theme.waxRed

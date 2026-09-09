@@ -11,6 +11,10 @@ enum Theme {
     static let waxBlack = Color(red: 0.10, green: 0.09, blue: 0.08)
     static let waxWhite = Color(red: 0.95, green: 0.95, blue: 0.96)
 
+    static let waxMagenta = Color(red: 0.95, green: 0.18, blue: 0.58)
+    static let waxCyan = Color(red: 0.18, green: 0.82, blue: 0.96)
+    static let waxNavy = Color(red: 0.05, green: 0.07, blue: 0.16)
+
     static func ink(dark: Bool) -> Color {
         dark ? Color(red: 0.93, green: 0.88, blue: 0.80) : ink
     }
@@ -25,6 +29,8 @@ enum Theme {
         case (.classic, .indigo): waxDusk
         case (.mono, .red): waxBlack
         case (.mono, .indigo): waxWhite
+        case (.neon, .red): waxMagenta
+        case (.neon, .indigo): waxCyan
         }
     }
 }

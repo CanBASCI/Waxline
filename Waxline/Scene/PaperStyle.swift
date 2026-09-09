@@ -8,6 +8,8 @@ enum PaperStyle {
     static let waxDusk = UIColor(red: 0.29, green: 0.25, blue: 0.42, alpha: 1)
     static let waxBlack = UIColor(red: 0.10, green: 0.09, blue: 0.08, alpha: 1)
     static let waxWhite = UIColor(red: 0.95, green: 0.95, blue: 0.96, alpha: 1)
+    static let waxMagenta = UIColor(red: 0.95, green: 0.18, blue: 0.58, alpha: 1)
+    static let waxCyan = UIColor(red: 0.18, green: 0.82, blue: 0.96, alpha: 1)
 
     private static let waxMap = makeWax(size: 256)
     private static var jpegCache: [String: UIImage] = [:]
@@ -28,6 +30,8 @@ enum PaperStyle {
         case (.classic, .indigo): waxDusk
         case (.mono, .red): waxBlack
         case (.mono, .indigo): waxWhite
+        case (.neon, .red): waxMagenta
+        case (.neon, .indigo): waxCyan
         }
     }
 
@@ -41,24 +45,36 @@ enum PaperStyle {
             return cached
         }
         if let color = bundleJPEG(theme.colorResource) {
-            let roughness: CGFloat = theme == .blossom
-                ? (recessed ? 0.58 : 0.42)
-                : (recessed ? 0.68 : 0.52)
-            let material = textured(color, roughness: roughness, metalness: 0.03)
+            let roughness: CGFloat
+            switch theme {
+            case .blossom: roughness = recessed ? 0.58 : 0.42
+            case .charcoal: roughness = recessed ? 0.68 : 0.52
+            case .neon: roughness = recessed ? 0.52 : 0.34
+            }
+            let material = textured(color, roughness: roughness, metalness: theme == .neon ? 0.08 : 0.03)
             applyRepeat(material, scale: 1.85, offset: offset)
             if recessed {
-                if theme == .blossom {
+                switch theme {
+                case .blossom:
                     material.multiply.contents = UIColor(red: 0.72, green: 0.54, blue: 0.58, alpha: 1)
-                } else {
+                case .charcoal:
                     material.multiply.contents = UIColor(red: 0.52, green: 0.53, blue: 0.56, alpha: 1)
+                case .neon:
+                    material.multiply.contents = UIColor(red: 0.22, green: 0.16, blue: 0.32, alpha: 1)
                 }
             }
             sakuraTabletCache[cacheKey] = material
             return material
         }
-        return unlit(theme == .blossom
-            ? UIColor(red: 0.78, green: 0.58, blue: 0.62, alpha: 1)
-            : UIColor(red: 0.28, green: 0.28, blue: 0.30, alpha: 1))
+        return unlit(fallbackColor(for: theme))
+    }
+
+    private static func fallbackColor(for theme: SakuraTabletTheme) -> UIColor {
+        switch theme {
+        case .blossom: UIColor(red: 0.78, green: 0.58, blue: 0.62, alpha: 1)
+        case .charcoal: UIColor(red: 0.28, green: 0.28, blue: 0.30, alpha: 1)
+        case .neon: UIColor(red: 0.07, green: 0.10, blue: 0.22, alpha: 1)
+        }
     }
 
     static func waxMaterial(color: UIColor) -> SCNMaterial {
