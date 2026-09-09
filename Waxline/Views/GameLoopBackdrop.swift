@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreMedia
 import SwiftUI
 
 struct GameLoopBackdrop: View {
@@ -7,6 +8,7 @@ struct GameLoopBackdrop: View {
 
     @State private var player: AVQueuePlayer?
     @State private var looper: AVPlayerLooper?
+    @State private var readyTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -30,12 +32,31 @@ struct GameLoopBackdrop: View {
         let queue = AVQueuePlayer()
         queue.isMuted = true
         queue.volume = 0
-        looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: url))
         player = queue
+        readyTask = Task { @MainActor in
+            await startLooping(url: url, on: queue)
+        }
+    }
+
+    private func startLooping(url: URL, on queue: AVQueuePlayer) async {
+        let asset = AVURLAsset(url: url)
+        let duration = (try? await asset.load(.duration)) ?? .invalid
+        let template = AVPlayerItem(asset: asset)
+        if duration.isNumeric, duration.seconds > 0.1 {
+            looper = AVPlayerLooper(
+                player: queue,
+                templateItem: template,
+                timeRange: CMTimeRange(start: .zero, duration: duration)
+            )
+        } else {
+            looper = AVPlayerLooper(player: queue, templateItem: template)
+        }
         queue.play()
     }
 
     private func stop() {
+        readyTask?.cancel()
+        readyTask = nil
         player?.pause()
     }
 }
