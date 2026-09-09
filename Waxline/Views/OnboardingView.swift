@@ -4,8 +4,9 @@ struct OnboardingView: View {
     var onDone: () -> Void
     @Environment(SettingsStore.self) private var settings
     @State private var page = 0
+    @State private var goingForward = true
 
-    private let pageCount = 4
+    private let pageCount = 5
 
     private func t(_ key: String.LocalizationValue) -> String {
         L10n.text(key, language: settings.language)
@@ -16,13 +17,17 @@ struct OnboardingView: View {
             VStack(spacing: 0) {
                 Spacer(minLength: 4)
 
-                pageBody
-                    .id(page)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)
-                    ))
-                    .highPriorityGesture(pageSwipe)
+                ZStack {
+                    pageBody
+                        .id(page)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: goingForward ? .trailing : .leading)
+                                .combined(with: .opacity),
+                            removal: .move(edge: goingForward ? .leading : .trailing)
+                                .combined(with: .opacity)
+                        ))
+                }
+                .highPriorityGesture(pageSwipe)
 
                 Spacer(minLength: 4)
 
@@ -52,17 +57,21 @@ struct OnboardingView: View {
         .presentationDragIndicator(.hidden)
         .presentationBackground(.background)
         .preferredColorScheme(settings.sakuraLook.colorScheme)
-        .animation(.easeOut(duration: 0.28), value: page)
     }
 
     private var pageBody: some View {
         VStack(spacing: 18) {
             pageArt(page)
-            Text(t(copy(for: page)))
-                .font(.system(.title3, design: .serif).weight(.medium))
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+            VStack(spacing: 10) {
+                Text(t(headline(for: page)))
+                    .font(.system(.title3, design: .serif).weight(.medium))
+                    .foregroundStyle(.primary)
+                Text(t(detail(for: page)))
+                    .font(.system(.callout, design: .serif))
+                    .foregroundStyle(.secondary)
+            }
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 28)
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
@@ -74,7 +83,7 @@ struct OnboardingView: View {
                 if value.translation.width < -50 {
                     advance()
                 } else if value.translation.width > 50, page > 0 {
-                    page -= 1
+                    show(page - 1)
                 }
             }
     }
@@ -84,15 +93,33 @@ struct OnboardingView: View {
             onDone()
             return
         }
-        page += 1
+        show(page + 1)
     }
 
-    private func copy(for index: Int) -> String.LocalizationValue {
+    private func show(_ newPage: Int) {
+        goingForward = newPage > page
+        withAnimation(.easeOut(duration: 0.28)) {
+            page = newPage
+        }
+    }
+
+    private func headline(for index: Int) -> String.LocalizationValue {
         switch index {
         case 0: "onboarding_place"
         case 1: "onboarding_quadrant"
         case 2: "onboarding_rotate"
-        default: "onboarding_five"
+        case 3: "onboarding_five"
+        default: "onboarding_invite"
+        }
+    }
+
+    private func detail(for index: Int) -> String.LocalizationValue {
+        switch index {
+        case 0: "onboarding_place_detail"
+        case 1: "onboarding_quadrant_detail"
+        case 2: "onboarding_rotate_detail"
+        case 3: "onboarding_five_detail"
+        default: "onboarding_invite_detail"
         }
     }
 
@@ -111,18 +138,52 @@ struct OnboardingView: View {
             tabletGrid(turned: false)
         case 2:
             tabletGrid(turned: true)
+        case 3:
+            VStack(spacing: 12) {
+                scoreSample(count: 5, points: 1, sealSize: 22)
+                scoreSample(count: 6, points: 2, sealSize: 20)
+            }
         default:
-            HStack(spacing: 10) {
-                ForEach(0..<5, id: \.self) { _ in
+            HStack(spacing: 16) {
+                SealMark(
+                    color: Theme.waxCinnabar,
+                    motif: Theme.gold,
+                    outline: Theme.ink.opacity(0.18),
+                    outlineWidth: 1.1
+                )
+                .frame(width: 56, height: 56)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                SealMark(
+                    color: Theme.waxDusk,
+                    motif: Theme.gold,
+                    outline: Theme.ink.opacity(0.18),
+                    outlineWidth: 1
+                )
+                .frame(width: 40, height: 40)
+                .opacity(0.55)
+            }
+        }
+    }
+
+    private func scoreSample(count: Int, points: Int, sealSize: CGFloat) -> some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 5) {
+                ForEach(0..<count, id: \.self) { _ in
                     SealMark(
                         color: Theme.waxBlack,
                         motif: Theme.gold,
-                        outline: Theme.ink.opacity(0.18),
+                        outline: Theme.ink.opacity(0.16),
                         outlineWidth: 1
                     )
-                    .frame(width: 28, height: 28)
+                    .frame(width: sealSize, height: sealSize)
                 }
             }
+            Text("+\(points)")
+                .font(.system(.headline, design: .serif).weight(.medium))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         }
     }
 

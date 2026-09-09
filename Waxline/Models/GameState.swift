@@ -41,11 +41,12 @@ final class GameState {
 
     func recordSeriesResult(you player: Player) {
         switch model.status {
-        case .won(let winner, _):
+        case .won(let winner, let line):
+            let points = MatchSeries.points(forWinningLine: line.count)
             if winner == player {
-                series.you += 1
+                series.you += points
             } else {
-                series.opponent += 1
+                series.opponent += points
             }
         case .draw:
             series.draws += 1

@@ -15,10 +15,10 @@ struct BoardModel: Sendable, Equatable {
             && cells.allSatisfy { row in row.allSatisfy { $0 == .empty } }
     }
 
-    static func empty() -> BoardModel {
+    static func empty(starting player: Player = .red) -> BoardModel {
         BoardModel(
             cells: Array(repeating: Array(repeating: .empty, count: 6), count: 6),
-            currentPlayer: .red,
+            currentPlayer: player,
             phase: .place,
             status: .playing,
             lastPlacement: nil,

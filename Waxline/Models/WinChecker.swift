@@ -4,6 +4,7 @@ enum WinChecker {
     private static let directions: [(Int, Int)] = [(0, 1), (1, 0), (1, 1), (1, -1)]
 
     static func line(for player: Player, cells: [[Cell]]) -> [Position]? {
+        var best: [Position] = []
         for row in 0..<6 {
             for col in 0..<6 {
                 for dir in directions {
@@ -21,13 +22,13 @@ enum WinChecker {
                         r += dir.0
                         c += dir.1
                     }
-                    if line.count >= 5 {
-                        return Array(line.prefix(5))
+                    if line.count >= 5, line.count > best.count {
+                        best = line
                     }
                 }
             }
         }
-        return nil
+        return best.isEmpty ? nil : best
     }
 
     static func status(of cells: [[Cell]]) -> GameStatus {

@@ -131,7 +131,8 @@ extension GameCenterService {
         rematchRed = false
         rematchIndigo = false
         leftBy = nil
-        await publish(.empty(), on: match, advanceTurn: true, toFirstPlayer: true)
+        let deal = nextRematchDeal()
+        await publish(deal, on: match, advanceTurn: true, to: deal.currentPlayer)
     }
 
     func ingest(_ match: GKTurnBasedMatch) {
@@ -140,15 +141,11 @@ extension GameCenterService {
         rematchRed = snapshot.wantsRematchRed
         rematchIndigo = snapshot.wantsRematchIndigo
         leftBy = snapshot.departed
+        matchHandIndex = snapshot.resolvedHandIndex
     }
 
     func encoded(_ model: BoardModel) -> Data {
-        MatchSnapshot.from(
-            model,
-            rematchRed: rematchRed,
-            rematchIndigo: rematchIndigo,
-            leftBy: leftBy
-        ).encoded()
+        encodedSnapshot(of: model)
     }
 
     func refreshedMatch() async -> GKTurnBasedMatch? {
@@ -167,21 +164,13 @@ extension GameCenterService {
         _ model: BoardModel,
         on match: GKTurnBasedMatch,
         advanceTurn: Bool,
-        toFirstPlayer: Bool = false
+        to player: Player? = nil
     ) async {
         let data = encoded(model)
         do {
             if advanceTurn, isLocalTurn(match) {
-                let next: [GKTurnBasedParticipant]
-                if toFirstPlayer, let first = match.participants.first {
-                    next = [first]
-                } else {
-                    let others = match.participants.filter { $0 !== match.currentParticipant }
-                    next = others.isEmpty ? match.participants : others
-                }
-                if toFirstPlayer,
-                   let first = match.participants.first,
-                   match.currentParticipant === first {
+                let next = nextParticipants(on: match, preferring: player)
+                if let target = next.first, match.currentParticipant === target {
                     try await match.saveCurrentTurn(withMatch: data)
                 } else {
                     try await match.endTurn(
@@ -199,6 +188,17 @@ extension GameCenterService {
             lastErrorMessage = error.localizedDescription
         }
         activeMatch = match
+    }
+
+    func nextParticipants(on match: GKTurnBasedMatch, preferring player: Player?) -> [GKTurnBasedParticipant] {
+        if let player {
+            let index = player == .red ? 0 : 1
+            if match.participants.indices.contains(index) {
+                return [match.participants[index]]
+            }
+        }
+        let others = match.participants.filter { $0 !== match.currentParticipant }
+        return others.isEmpty ? match.participants : others
     }
 
     func sendExchange(_ data: Data, on match: GKTurnBasedMatch) async throws {

@@ -81,6 +81,7 @@ extension GameCenterService {
     }
 
     func handleInvite(_ invite: GKInvite) {
+        markLiveInvite(from: invite)
         guard isAuthenticated else {
             pendingGKInvite = invite
             authenticate()
@@ -98,6 +99,7 @@ extension GameCenterService {
     }
 
     func presentMatchmaker(for request: GKMatchRequest) {
+        markLocalAsLiveInviter()
         guard isAuthenticated else {
             authenticate()
             return

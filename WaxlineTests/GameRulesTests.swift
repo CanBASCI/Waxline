@@ -131,6 +131,22 @@ struct WinCheckerTests {
         #expect(WinChecker.line(for: .indigo, cells: cells)?.count == 5)
     }
 
+    @Test func sixInARowKeepsEveryStone() {
+        var cells = emptyGrid()
+        for col in 0..<6 { cells[2][col] = .red }
+        let line = WinChecker.line(for: .red, cells: cells)
+        #expect(line == (0..<6).map { Position(row: 2, col: $0) })
+        #expect(WinChecker.status(of: cells) == .won(.red, line: line!))
+    }
+
+    @Test func longestLineBeatsAShorterFive() {
+        var cells = emptyGrid()
+        for col in 0..<5 { cells[0][col] = .red }
+        for row in 0..<6 { cells[row][5] = .red }
+        let line = WinChecker.line(for: .red, cells: cells)
+        #expect(line?.count == 6)
+    }
+
     @Test func doubleFiveIsDraw() {
         var cells = emptyGrid()
         for col in 0..<5 { cells[0][col] = .red }
@@ -211,6 +227,34 @@ struct BoardModelTests {
     }
 }
 
+@MainActor
+struct SeriesScoringTests {
+    @Test func fiveInARowIsOnePoint() {
+        #expect(MatchSeries.points(forWinningLine: 5) == 1)
+        let game = GameState(mode: .ai(.easy), model: wonBoard(length: 5, player: .red))
+        game.recordSeriesResult(you: .red)
+        #expect(game.series.you == 1)
+        #expect(game.series.opponent == 0)
+    }
+
+    @Test func sixInARowIsTwoPoints() {
+        #expect(MatchSeries.points(forWinningLine: 6) == 2)
+        let game = GameState(mode: .ai(.easy), model: wonBoard(length: 6, player: .indigo))
+        game.recordSeriesResult(you: .red)
+        #expect(game.series.you == 0)
+        #expect(game.series.opponent == 2)
+    }
+
+    private func wonBoard(length: Int, player: Player) -> BoardModel {
+        var board = BoardModel.empty()
+        for col in 0..<length {
+            board.cells[0][col] = player.cell
+        }
+        board.status = .won(player, line: (0..<length).map { Position(row: 0, col: $0) })
+        return board
+    }
+}
+
 struct MatchSnapshotTests {
     @Test func encodesPlacementAndRotationForReplay() {
         var board = BoardModel.empty()
@@ -250,5 +294,46 @@ struct MatchSnapshotTests {
         let restored = MatchSnapshot.decode(snapshot.encoded())
         #expect(restored?.wantsRematchRed == true)
         #expect(restored?.departed == .indigo)
+    }
+
+    @Test func encodesHandIndexAndInviter() {
+        let board = BoardModel.empty(starting: .indigo)
+        let snapshot = MatchSnapshot.from(board, handIndex: 3, inviterID: "host-1")
+        #expect(snapshot.resolvedHandIndex == 3)
+        #expect(snapshot.inviterID == "host-1")
+        let restored = MatchSnapshot.decode(snapshot.encoded())
+        #expect(restored?.resolvedHandIndex == 3)
+        #expect(restored?.inviterID == "host-1")
+        #expect(restored?.toModel().currentPlayer == .indigo)
+    }
+
+    @Test func decodesLegacyPayloadWithoutHandIndex() throws {
+        let payload = """
+        {"version":1,"cells":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"currentPlayer":1,"phase":0,"winner":0,"winRows":[],"winCols":[]}
+        """
+        let data = try #require(payload.data(using: .utf8))
+        let snapshot = try #require(MatchSnapshot.decode(data))
+        #expect(snapshot.resolvedHandIndex == 0)
+        #expect(snapshot.inviterID == nil)
+    }
+}
+
+struct MatchSeatingTests {
+    @Test func inviterStartsEvenHands() {
+        #expect(MatchSeating.starter(forHand: 0) == .red)
+        #expect(MatchSeating.starter(forHand: 2) == .red)
+        #expect(MatchSeating.starter(forHand: 1) == .indigo)
+        #expect(MatchSeating.starter(forHand: 3) == .indigo)
+    }
+
+    @Test func inviterIsAlwaysRed() {
+        #expect(MatchSeating.color(localID: "host", inviterID: "host") == .red)
+        #expect(MatchSeating.color(localID: "guest", inviterID: "host") == .indigo)
+    }
+
+    @Test func rematchDealStartsWithIndigo() {
+        let board = BoardModel.empty(starting: MatchSeating.starter(forHand: 1))
+        #expect(board.currentPlayer == .indigo)
+        #expect(board.isFreshDeal)
     }
 }

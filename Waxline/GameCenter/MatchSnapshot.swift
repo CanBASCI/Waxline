@@ -17,10 +17,13 @@ struct MatchSnapshot: Codable, Equatable, Sendable {
     var leftBy: Int?
     var hostHeartbeat: Double?
     var hostSuspended: Bool?
+    var handIndex: Int?
+    var inviterID: String?
 
     var wantsRematchRed: Bool { rematchRed ?? false }
     var wantsRematchIndigo: Bool { rematchIndigo ?? false }
     var departed: Player? { leftBy.flatMap(Player.init(rawValue:)) }
+    var resolvedHandIndex: Int { handIndex ?? 0 }
 
     static func from(
         _ model: BoardModel,
@@ -28,7 +31,9 @@ struct MatchSnapshot: Codable, Equatable, Sendable {
         rematchIndigo: Bool = false,
         leftBy: Player? = nil,
         hostHeartbeat: Double? = nil,
-        hostSuspended: Bool = false
+        hostSuspended: Bool = false,
+        handIndex: Int = 0,
+        inviterID: String? = nil
     ) -> MatchSnapshot {
         var cells: [UInt8] = []
         cells.reserveCapacity(36)
@@ -66,7 +71,9 @@ struct MatchSnapshot: Codable, Equatable, Sendable {
             rematchIndigo: rematchIndigo,
             leftBy: leftBy?.rawValue,
             hostHeartbeat: hostHeartbeat,
-            hostSuspended: hostSuspended ? true : nil
+            hostSuspended: hostSuspended ? true : nil,
+            handIndex: handIndex,
+            inviterID: inviterID
         )
     }
 

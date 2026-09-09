@@ -20,6 +20,8 @@ final class GameCenterService: NSObject {
     var liveMatch: GKMatch?
     var liveBoard = BoardModel.empty()
     var liveLocalColor: Player = .red
+    var liveInviterID: String?
+    var matchHandIndex = 0
     var pendingGKInvite: GKInvite?
     var didLeaveLocally = false
     var didAnnounceLive = false
@@ -163,7 +165,7 @@ final class GameCenterService: NSObject {
                 rematchRed = false
                 rematchIndigo = false
                 leftBy = nil
-                liveBoard = .empty()
+                liveBoard = nextRematchDeal()
                 await submitLive(liveBoard)
             } else {
                 await submitLive(currentModel)
@@ -217,6 +219,31 @@ final class GameCenterService: NSObject {
         rematchRed = false
         rematchIndigo = false
         leftBy = nil
+        matchHandIndex = 0
+    }
+
+    func markLocalAsLiveInviter() {
+        liveInviterID = GKLocalPlayer.local.gamePlayerID
+    }
+
+    func markLiveInvite(from invite: GKInvite) {
+        liveInviterID = invite.sender.gamePlayerID
+    }
+
+    func nextRematchDeal() -> BoardModel {
+        matchHandIndex += 1
+        return .empty(starting: MatchSeating.starter(forHand: matchHandIndex))
+    }
+
+    func encodedSnapshot(of model: BoardModel) -> Data {
+        MatchSnapshot.from(
+            model,
+            rematchRed: rematchRed,
+            rematchIndigo: rematchIndigo,
+            leftBy: leftBy,
+            handIndex: matchHandIndex,
+            inviterID: liveInviterID
+        ).encoded()
     }
 
     func topViewController() -> UIViewController? {

@@ -65,6 +65,20 @@ struct MatchSeries: Equatable, Sendable {
     var draws = 0
 
     var hasHands: Bool { you + opponent + draws > 0 }
+
+    static func points(forWinningLine length: Int) -> Int {
+        length >= 6 ? 2 : 1
+    }
+}
+
+enum MatchSeating {
+    static func starter(forHand index: Int) -> Player {
+        index % 2 == 0 ? .red : .indigo
+    }
+
+    static func color(localID: String, inviterID: String) -> Player {
+        localID == inviterID ? .red : .indigo
+    }
 }
 
 enum SakuraLook: String, Sendable, CaseIterable {

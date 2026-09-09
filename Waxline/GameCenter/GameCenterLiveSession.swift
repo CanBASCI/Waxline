@@ -9,7 +9,7 @@ extension GameCenterService {
         }
         incomingMatch = nil
         resetSessionFlags()
-        liveBoard = .empty()
+        liveBoard = .empty(starting: MatchSeating.starter(forHand: 0))
         liveMatch = match
         match.delegate = self
         didAnnounceLive = false
@@ -27,12 +27,7 @@ extension GameCenterService {
     func submitLive(_ model: BoardModel) async {
         liveBoard = model
         guard let match = liveMatch else { return }
-        let data = MatchSnapshot.from(
-            model,
-            rematchRed: rematchRed,
-            rematchIndigo: rematchIndigo,
-            leftBy: leftBy
-        ).encoded()
+        let data = encodedSnapshot(of: model)
         do {
             try match.sendData(toAllPlayers: data, with: .reliable)
         } catch {
@@ -45,18 +40,14 @@ extension GameCenterService {
         leftBy = liveLocalColor
         liveBoard = model
         if let match = liveMatch {
-            let data = MatchSnapshot.from(
-                model,
-                rematchRed: rematchRed,
-                rematchIndigo: rematchIndigo,
-                leftBy: leftBy
-            ).encoded()
+            let data = encodedSnapshot(of: model)
             try? match.sendData(toAllPlayers: data, with: .reliable)
             match.delegate = nil
             match.disconnect()
         }
         liveMatch = nil
         liveSessionID = nil
+        liveInviterID = nil
         didAnnounceLive = false
     }
 
@@ -64,14 +55,28 @@ extension GameCenterService {
         guard let snapshot = MatchSnapshot.decode(data) else { return }
         rematchRed = snapshot.wantsRematchRed
         rematchIndigo = snapshot.wantsRematchIndigo
+        matchHandIndex = snapshot.resolvedHandIndex
+        if let inviterID = snapshot.inviterID, !inviterID.isEmpty {
+            liveInviterID = inviterID
+        }
         if leftBy == nil {
             leftBy = snapshot.departed
+        }
+        if let match = liveMatch {
+            assignLiveColors(from: match)
         }
         liveBoard = snapshot.toModel()
         matchRevision += 1
     }
 
     private func assignLiveColors(from match: GKMatch) {
+        if let inviterID = liveInviterID, !inviterID.isEmpty {
+            liveLocalColor = MatchSeating.color(
+                localID: GKLocalPlayer.local.gamePlayerID,
+                inviterID: inviterID
+            )
+            return
+        }
         let ids = ([GKLocalPlayer.local.gamePlayerID] + match.players.map(\.gamePlayerID)).sorted()
         liveLocalColor = ids.first == GKLocalPlayer.local.gamePlayerID ? .red : .indigo
     }
