@@ -191,6 +191,7 @@ struct SealMark: View {
     var outline: Color? = nil
     var outlineWidth: CGFloat? = nil
     var glass: Bool = false
+    var castShadow: Bool = true
 
     var body: some View {
         GeometryReader { geo in
@@ -202,7 +203,11 @@ struct SealMark: View {
                 } else {
                     shape
                         .fill(color)
-                        .shadow(color: color.opacity(side > 40 ? 0.35 : 0.2), radius: side * 0.12, y: side * 0.08)
+                        .shadow(
+                            color: castShadow ? color.opacity(side > 40 ? 0.35 : 0.2) : .clear,
+                            radius: side * 0.12,
+                            y: side * 0.08
+                        )
                         .overlay {
                             if let outline {
                                 shape.stroke(outline, lineWidth: outlineWidth ?? max(1, side * 0.05))

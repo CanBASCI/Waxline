@@ -215,13 +215,11 @@ struct GameView: View {
                         fill: hudChromeFill,
                         stroke: hudChromeInk.opacity(0.35)
                     )
-                    .shadow(color: usesHUDGlass ? .clear : textHalo, radius: 8)
             }
             .buttonStyle(.plain)
             .animation(.easeInOut(duration: 0.22), value: sakuraLook)
             Spacer(minLength: 8)
             lookToggle
-                .shadow(color: usesHUDGlass ? .clear : textHalo, radius: 8)
                 .animation(.easeInOut(duration: 0.22), value: sakuraLook)
         }
         .hudGlassCluster(enabled: usesHUDGlass)
@@ -261,7 +259,6 @@ struct GameView: View {
         .padding(.top, boardGutter)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .shadow(color: usesHUDGlass ? .clear : textHalo, radius: 8)
     }
 
     private var showsOpponentIdentity: Bool {
@@ -411,9 +408,10 @@ struct GameView: View {
                 SealMark(
                     color: Theme.seal(player, palette: activeSeals),
                     motif: reserveMotif(player),
-                    outline: usesHUDGlass ? nil : stackEdge(for: player),
+                    outline: nil,
                     outlineWidth: 1.2 * sealScale,
-                    glass: usesHUDGlass && index == count - 1
+                    glass: index == count - 1,
+                    castShadow: false
                 )
                 .frame(width: size, height: size)
                 .offset(y: -CGFloat(index) * step)
@@ -439,11 +437,6 @@ struct GameView: View {
             return Theme.waxBlack
         }
         return Theme.gold
-    }
-
-    private func stackEdge(for player: Player) -> Color {
-        let isWhite = activeSeals == .mono && player == .indigo
-        return isWhite ? Theme.waxBlack : Color.white
     }
 
     private var boardStatusText: String? {
@@ -483,7 +476,6 @@ struct GameView: View {
                     stroke: hudChromeInk.opacity(0.35),
                     dark: usesHUDGlass
                 )
-                .shadow(color: usesHUDGlass ? .clear : textHalo, radius: 8)
                 .contentTransition(.symbolEffect(.replace, options: .speed(0.4 / 0.2)))
         }
         .buttonStyle(.plain)
@@ -580,7 +572,6 @@ struct GameView: View {
     }
     private var ink: Color { Color(white: 0.96) }
     private var boardInk: Color { ink }
-    private var textHalo: Color { Color.black.opacity(0.55) }
     private var overlayHalo: Color { Color.black.opacity(0.55) }
     private var overlayCopy: Color {
         usesHUDGlass
@@ -668,7 +659,6 @@ struct GameView: View {
                 stroke: hudChromeInk.opacity(0.35),
                 dark: usesHUDGlass
             )
-            .shadow(color: usesHUDGlass ? .clear : textHalo, radius: 8)
             .opacity(isHumanTurn && turnSecondsLeft > 0 ? 1 : 0)
             .animation(.easeInOut(duration: 0.18), value: turnSecondsLeft)
             .accessibilityLabel(t("turn_timer"))
