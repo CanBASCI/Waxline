@@ -8,6 +8,7 @@ struct ResultSheet: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(GameCenterService.self) private var gameCenter
     @State private var confirmLeave = false
+    @State private var frozenStatus: GameStatus?
 
     private func t(_ key: String.LocalizationValue) -> String {
         L10n.text(key, language: settings.language)
@@ -56,6 +57,11 @@ struct ResultSheet: View {
         .interactiveDismissDisabled()
         .presentationBackground(.background)
         .preferredColorScheme(settings.sakuraLook.colorScheme)
+        .onAppear {
+            if game.status != .playing {
+                frozenStatus = game.status
+            }
+        }
         .alert(t("gc_leave_title"), isPresented: $confirmLeave) {
             Button(t("gc_leave_confirm"), role: .destructive, action: onMenu)
             Button(t("gc_cancel"), role: .cancel) {}
@@ -76,7 +82,7 @@ struct ResultSheet: View {
         if opponentLeft {
             return t("opponent_left")
         }
-        switch game.status {
+        switch shownStatus {
         case .draw:
             return t("draw")
         case .playing:
@@ -124,8 +130,12 @@ struct ResultSheet: View {
         game.mode == .gameCenter && gameCenter.opponentWantsRematch()
     }
 
+    private var shownStatus: GameStatus {
+        frozenStatus ?? game.status
+    }
+
     private var badgeColor: Color {
-        switch game.status {
+        switch shownStatus {
         case .won(let player, _):
             Theme.seal(player, palette: seals)
         default:
@@ -134,7 +144,7 @@ struct ResultSheet: View {
     }
 
     private var isWhiteWin: Bool {
-        if case .won(let player, _) = game.status {
+        if case .won(let player, _) = shownStatus {
             return seals == .mono && player == .indigo
         }
         return false
@@ -142,8 +152,8 @@ struct ResultSheet: View {
 
     private var badgeMotif: Color {
         if isWhiteWin { return Theme.waxBlack }
-        if case .draw = game.status { return Theme.waxBlack }
-        if case .playing = game.status { return Theme.waxBlack }
+        if case .draw = shownStatus { return Theme.waxBlack }
+        if case .playing = shownStatus { return Theme.waxBlack }
         return Theme.gold
     }
 }
