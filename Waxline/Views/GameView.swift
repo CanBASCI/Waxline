@@ -75,7 +75,7 @@ struct GameView: View {
             ZStack(alignment: .bottom) {
                 GameLoopBackdrop(
                     resource: backdropResource,
-                    ext: "mov"
+                    ext: backdropExtension
                 )
                 .id(sakuraLook)
                 LinearGradient(
@@ -559,6 +559,10 @@ struct GameView: View {
         case .mono: "gamescreensakuravideo_2"
         case .neon: "gameplay_neon_video"
         }
+    }
+
+    private var backdropExtension: String {
+        sakuraLook == .neon ? "mp4" : "mov"
     }
 
     private var usesHUDGlass: Bool { sakuraLook == .neon }

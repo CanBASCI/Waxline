@@ -165,6 +165,7 @@ struct RootView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
+            menuIntro.handleScenePhase(phase)
             if phase == .active {
                 Task { await gameCenter.refreshPendingInvites() }
             }

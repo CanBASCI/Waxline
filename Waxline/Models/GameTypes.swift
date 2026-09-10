@@ -109,6 +109,14 @@ enum LanguageOverride: String, Sendable, Codable, CaseIterable, Identifiable {
         case .turkish: Locale(identifier: "tr")
         }
     }
+
+    var catalogCode: String? {
+        switch self {
+        case .system: nil
+        case .english: "en"
+        case .turkish: "tr"
+        }
+    }
 }
 
 enum SealPalette: String, Sendable, Codable, CaseIterable {

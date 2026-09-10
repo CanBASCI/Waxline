@@ -90,6 +90,18 @@ final class MenuIntroPlayback {
         }
     }
 
+    func handleScenePhase(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            if menuVisible {
+                resumeIfNeeded()
+            }
+        default:
+            player.pause()
+            musicPlayer?.pause()
+        }
+    }
+
     private func load() {
         guard let url = Bundle.main.url(forResource: "mainpagesakuravideo", withExtension: "mp4") else {
             didFinish = true
@@ -187,6 +199,7 @@ final class MenuIntroPlayback {
     }
 
     private func resumeIfNeeded() {
+        guard menuVisible else { return }
         activateSession()
         if didFinish {
             player.pause()
@@ -196,6 +209,9 @@ final class MenuIntroPlayback {
         } else {
             player.isMuted = !soundEnabled
             player.play()
+            if player.timeControlStatus != .playing {
+                player.playImmediately(atRate: 1)
+            }
         }
     }
 

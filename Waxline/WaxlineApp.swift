@@ -18,6 +18,7 @@ struct WaxlineApp: App {
             RootView()
                 .environment(settings)
                 .environment(gameCenter)
+                .environment(\.locale, settings.language.locale ?? .autoupdatingCurrent)
                 .preferredColorScheme(.light)
                 .tint(Theme.waxRed)
         }

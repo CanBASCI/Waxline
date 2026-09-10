@@ -44,9 +44,20 @@ final class SettingsStore {
 
 enum L10n {
     static func text(_ key: String.LocalizationValue, language: LanguageOverride) -> String {
-        if let locale = language.locale {
-            return String(localized: key, locale: locale)
+        String(
+            localized: key,
+            bundle: bundle(for: language),
+            locale: language.locale ?? .autoupdatingCurrent
+        )
+    }
+
+    private static func bundle(for language: LanguageOverride) -> Bundle {
+        guard let code = language.catalogCode,
+              let path = Bundle.main.path(forResource: code, ofType: "lproj"),
+              let bundle = Bundle(path: path)
+        else {
+            return .main
         }
-        return String(localized: key)
+        return bundle
     }
 }
