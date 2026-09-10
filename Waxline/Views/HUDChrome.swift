@@ -33,18 +33,12 @@ extension View {
     @ViewBuilder
     func hudGlassCluster(enabled: Bool, light: Bool = false) -> some View {
         if enabled {
-            if #available(iOS 26.0, *) {
-                if light {
-                    GlassEffectContainer(spacing: 12) { self }
-                        .environment(\.colorScheme, .light)
-                        .colorScheme(.light)
-                } else {
-                    GlassEffectContainer(spacing: 12) { self }
-                }
-            } else if light {
-                self.environment(\.colorScheme, .light).colorScheme(.light)
+            if light {
+                GlassEffectContainer(spacing: 12) { self }
+                    .environment(\.colorScheme, .light)
+                    .colorScheme(.light)
             } else {
-                self
+                GlassEffectContainer(spacing: 12) { self }
             }
         } else {
             self
@@ -74,30 +68,18 @@ private struct HUDChromeModifier: ViewModifier {
     @ViewBuilder
     private func chrome<S: Shape>(_ content: Content, _ shape: S) -> some View {
         if glass {
-            if #available(iOS 26.0, *) {
-                if light {
-                    content
-                        .environment(\.colorScheme, .light)
-                        .colorScheme(.light)
-                        .glassEffect(glassStyle, in: shape)
-                } else if dark {
-                    content
-                        .environment(\.colorScheme, .dark)
-                        .colorScheme(.dark)
-                        .glassEffect(glassStyle, in: shape)
-                } else {
-                    content.glassEffect(glassStyle, in: shape)
-                }
-            } else if light {
+            if light {
                 content
                     .environment(\.colorScheme, .light)
-                    .background(.ultraThinMaterial, in: shape)
+                    .colorScheme(.light)
+                    .glassEffect(glassStyle, in: shape)
             } else if dark {
                 content
                     .environment(\.colorScheme, .dark)
-                    .background(.ultraThinMaterial, in: shape)
+                    .colorScheme(.dark)
+                    .glassEffect(glassStyle, in: shape)
             } else {
-                content.background(.ultraThinMaterial, in: shape)
+                content.glassEffect(glassStyle, in: shape)
             }
         } else {
             content
@@ -108,7 +90,6 @@ private struct HUDChromeModifier: ViewModifier {
         }
     }
 
-    @available(iOS 26.0, *)
     private var glassStyle: Glass {
         var style = Glass.regular
         if let tint {

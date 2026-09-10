@@ -43,14 +43,7 @@ struct MenuView: View {
 
                 VStack(alignment: .trailing, spacing: 14) {
                     textLink(t("menu_ai"), index: 0, action: onAI)
-                    VStack(alignment: .trailing, spacing: 4) {
-                        gameCenterLink(index: 1)
-                        if !gameCenter.isAuthenticated, playback.didFinish {
-                            Text(t("gc_sign_in"))
-                                .font(.footnote)
-                                .foregroundStyle(Theme.ink.opacity(0.55))
-                        }
-                    }
+                    gameCenterLink(index: 1)
                     textLink(t("menu_how_to_play"), index: 2, action: onHowToPlay)
                     textLink(t("menu_settings"), index: 3, action: onSettings)
                     textLink(t("menu_more_apps"), index: 4, action: onMoreApps)
@@ -113,33 +106,35 @@ struct MenuView: View {
 
     private func gameCenterLink(index: Int) -> some View {
         Button(action: onGameCenter) {
-            HStack(spacing: 8) {
-                if gameCenter.pendingInviteCount > 0 {
-                    Text("\(gameCenter.pendingInviteCount)")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, gameCenter.pendingInviteCount > 9 ? 5 : 0)
-                        .frame(minWidth: 18, minHeight: 18)
-                        .background(Color.red, in: Capsule())
-                        .accessibilityLabel(t("gc_invites"))
+            VStack(alignment: .trailing, spacing: 4) {
+                HStack(spacing: 8) {
+                    if gameCenter.pendingInviteCount > 0 {
+                        Text("\(gameCenter.pendingInviteCount)")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, gameCenter.pendingInviteCount > 9 ? 5 : 0)
+                            .frame(minWidth: 18, minHeight: 18)
+                            .background(Color.red, in: Capsule())
+                            .accessibilityLabel(t("gc_invites"))
+                    }
+                    Text(t("menu_gamecenter"))
                 }
-                Text(t("menu_gamecenter"))
+                if !gameCenter.isAuthenticated, playback.didFinish {
+                    Text(t("gc_sign_in"))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.ink.opacity(0.55))
+                }
             }
         }
         .buttonStyle(.plain)
-        .disabled(!gameCenter.isAuthenticated)
-        .opacity(gameCenter.isAuthenticated ? 1 : 0.38)
+        .opacity(gameCenter.isAuthenticated ? 1 : 0.62)
         .menuLineMotion(revealed: playback.didFinish, idle: idle, index: index)
     }
 }
 
 private struct SkipCutoutBackdrop: View {
     var body: some View {
-        if #available(iOS 26.0, *) {
-            Color.clear.glassEffect(.regular, in: Capsule())
-        } else {
-            Color.clear.background(.ultraThinMaterial, in: Capsule())
-        }
+        Color.clear.glassEffect(.regular, in: Capsule())
     }
 }
 
@@ -228,15 +223,9 @@ struct SealMark: View {
 
     @ViewBuilder
     private func glassPlate(side: CGFloat, shape: RoundedRectangle) -> some View {
-        if #available(iOS 26.0, *) {
-            Color.clear
-                .frame(width: side, height: side)
-                .glassEffect(.regular.tint(color), in: shape)
-        } else {
-            shape
-                .fill(.ultraThinMaterial)
-                .overlay(shape.fill(color.opacity(0.42)))
-        }
+        Color.clear
+            .frame(width: side, height: side)
+            .glassEffect(.regular.tint(color), in: shape)
     }
 }
 

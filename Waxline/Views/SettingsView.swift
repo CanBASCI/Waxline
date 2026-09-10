@@ -27,6 +27,9 @@ struct SettingsView: View {
                     Picker(t("settings_language"), selection: $settings.language) {
                         Text(t("language_system")).tag(LanguageOverride.system)
                         Text(t("language_english")).tag(LanguageOverride.english)
+                        Text(t("language_german")).tag(LanguageOverride.german)
+                        Text(t("language_spanish")).tag(LanguageOverride.spanish)
+                        Text(t("language_japanese")).tag(LanguageOverride.japanese)
                         Text(t("language_turkish")).tag(LanguageOverride.turkish)
                     }
                 }

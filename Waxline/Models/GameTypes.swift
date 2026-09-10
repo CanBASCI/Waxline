@@ -98,22 +98,31 @@ enum AILevel: String, Sendable, Codable, CaseIterable, Identifiable {
 enum LanguageOverride: String, Sendable, Codable, CaseIterable, Identifiable {
     case system
     case english
+    case german
+    case spanish
+    case japanese
     case turkish
 
     var id: String { rawValue }
 
-    var locale: Locale? {
+    nonisolated var locale: Locale? {
         switch self {
         case .system: nil
         case .english: Locale(identifier: "en")
+        case .german: Locale(identifier: "de")
+        case .spanish: Locale(identifier: "es")
+        case .japanese: Locale(identifier: "ja")
         case .turkish: Locale(identifier: "tr")
         }
     }
 
-    var catalogCode: String? {
+    nonisolated var catalogCode: String? {
         switch self {
         case .system: nil
         case .english: "en"
+        case .german: "de"
+        case .spanish: "es"
+        case .japanese: "ja"
         case .turkish: "tr"
         }
     }

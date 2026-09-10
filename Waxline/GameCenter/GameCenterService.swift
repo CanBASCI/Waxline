@@ -6,7 +6,6 @@ import UIKit
 @Observable
 final class GameCenterService: NSObject {
     var isAuthenticated = false
-    var authViewController: UIViewController?
     var matchmakerPresented = false
     var activeMatch: GKTurnBasedMatch?
     var lastErrorMessage: String?
@@ -43,7 +42,7 @@ final class GameCenterService: NSObject {
         if let name = opponentPlayer()?.displayName, !name.isEmpty {
             return name
         }
-        return String(localized: "gc_unknown_player")
+        return L10n.system("gc_unknown_player")
     }
 
     func localPlayerColor() -> Player {
@@ -121,10 +120,9 @@ final class GameCenterService: NSObject {
         GKLocalPlayer.local.authenticateHandler = { [weak self] viewController, error in
             guard let self else { return }
             if let viewController {
-                self.authViewController = viewController
+                self.presentGameCenterAuth(viewController)
                 return
             }
-            self.authViewController = nil
             self.isAuthenticated = GKLocalPlayer.local.isAuthenticated
             if self.isAuthenticated {
                 GKLocalPlayer.local.register(self)
@@ -134,13 +132,25 @@ final class GameCenterService: NSObject {
                     self.handleInvite(invite)
                 }
             }
-            if let error {
-                let skip = isAuthenticated && isTransientGameCenterError(error)
-                if !skip {
-                    self.lastErrorMessage = error.localizedDescription
-                }
+            if let error, !isBenignAuthDismissal(error) {
+                self.lastErrorMessage = error.localizedDescription
             }
         }
+    }
+
+    func presentGameCenterAuth(_ controller: UIViewController) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if controller.presentingViewController != nil { return }
+            guard let top = self.topViewController() else { return }
+            if top === controller || top.presentedViewController === controller { return }
+            top.present(controller, animated: true)
+        }
+    }
+
+    func isBenignAuthDismissal(_ error: Error) -> Bool {
+        if isAuthenticated && isTransientGameCenterError(error) { return true }
+        return isBenignMatchmakerDismissal(error)
     }
 
     func submitTurn(model: BoardModel) async {

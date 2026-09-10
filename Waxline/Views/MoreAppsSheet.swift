@@ -14,13 +14,13 @@ enum MoreAppsCatalog {
             name: "Coffee Atlas - My Journey",
             iconResource: "coffee_atlas_icon",
             subtitleKey: "more_apps_coffee_subtitle",
-            storeURL: URL(string: "https://apps.apple.com/tr/app/coffee-atlas-my-journey/id6757154434")!
+            storeURL: URL(string: "https://apps.apple.com/app/id6757154434")!
         ),
         MoreApp(
             name: "Eventime - Hub",
             iconResource: "eventime_hub_icon",
             subtitleKey: "more_apps_eventime_subtitle",
-            storeURL: URL(string: "https://apps.apple.com/tr/app/eventime-hub/id6743343288")!
+            storeURL: URL(string: "https://apps.apple.com/app/id6743343288")!
         )
     ]
 }

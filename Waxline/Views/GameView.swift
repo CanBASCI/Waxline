@@ -147,11 +147,18 @@ struct GameView: View {
                 .environment(\.colorScheme, sakuraLook.colorScheme)
                 .preferredColorScheme(sakuraLook.colorScheme)
         }
-        .alert(t("gc_leave_title"), isPresented: $confirmLeave) {
-            Button(t("gc_leave_confirm"), role: .destructive, action: leaveAndExit)
-            Button(t("gc_cancel"), role: .cancel) {}
-        } message: {
-            Text(t("gc_leave_message"))
+        .sheet(isPresented: $confirmLeave) {
+            LeaveMatchConfirm(
+                onLeave: {
+                    confirmLeave = false
+                    leaveAndExit()
+                },
+                onCancel: { confirmLeave = false }
+            )
+            .presentationDetents([.height(320)])
+            .presentationDragIndicator(.hidden)
+            .presentationBackground(.background)
+            .preferredColorScheme(sakuraLook.colorScheme)
         }
         .alert(t("gc_invite_declined_title"), isPresented: $showInviteDeclined) {
             Button(t("gc_invite_declined_ok"), action: leaveAfterDecline)

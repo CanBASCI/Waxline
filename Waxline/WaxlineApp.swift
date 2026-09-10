@@ -2,6 +2,11 @@ import SwiftUI
 import UIKit
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
+    override init() {
+        DeviceLanguage.clearAppLanguageOverride()
+        super.init()
+    }
+
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         .portrait
     }
@@ -18,7 +23,6 @@ struct WaxlineApp: App {
             RootView()
                 .environment(settings)
                 .environment(gameCenter)
-                .environment(\.locale, settings.language.locale ?? .autoupdatingCurrent)
                 .preferredColorScheme(.light)
                 .tint(Theme.waxRed)
         }

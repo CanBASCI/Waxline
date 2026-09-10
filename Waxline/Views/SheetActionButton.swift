@@ -47,3 +47,37 @@ struct SheetActionButton: View {
         Theme.ink(dark: sheetDark).opacity(0.35)
     }
 }
+
+struct LeaveMatchConfirm: View {
+    var onLeave: () -> Void
+    var onCancel: () -> Void
+
+    @Environment(SettingsStore.self) private var settings
+
+    private func t(_ key: String.LocalizationValue) -> String {
+        L10n.text(key, language: settings.language)
+    }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Text(t("gc_leave_title"))
+                .font(.system(.title3, design: .serif).weight(.semibold))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 8)
+
+            Text(t("gc_leave_message"))
+                .font(.system(.subheadline, design: .serif))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            VStack(spacing: 10) {
+                SheetActionButton(title: t("gc_leave_confirm"), prominent: true, action: onLeave)
+                SheetActionButton(title: t("gc_cancel"), prominent: false, action: onCancel)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+    }
+}

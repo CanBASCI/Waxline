@@ -2,20 +2,6 @@ import GameKit
 import SwiftUI
 import UIKit
 
-struct GameCenterAuthPresenter: UIViewControllerRepresentable {
-    var viewController: UIViewController
-
-    func makeUIViewController(context: Context) -> UIViewController {
-        UIViewController()
-    }
-
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-        if uiViewController.presentedViewController == nil {
-            uiViewController.present(viewController, animated: true)
-        }
-    }
-}
-
 struct GameCenterInviteList: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(GameCenterService.self) private var gameCenter

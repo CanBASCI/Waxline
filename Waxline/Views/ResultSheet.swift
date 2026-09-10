@@ -15,6 +15,29 @@ struct ResultSheet: View {
     }
 
     var body: some View {
+        Group {
+            if confirmLeave {
+                LeaveMatchConfirm(
+                    onLeave: onMenu,
+                    onCancel: { confirmLeave = false }
+                )
+            } else {
+                resultBody
+            }
+        }
+        .presentationDetents([.height(sheetHeight)])
+        .presentationDragIndicator(.hidden)
+        .interactiveDismissDisabled()
+        .presentationBackground(.background)
+        .preferredColorScheme(settings.sakuraLook.colorScheme)
+        .onAppear {
+            if game.status != .playing {
+                frozenStatus = game.status
+            }
+        }
+    }
+
+    private var resultBody: some View {
         VStack(spacing: 14) {
             SealMark(
                 color: badgeColor,
@@ -52,22 +75,6 @@ struct ResultSheet: View {
         .padding(.horizontal, 20)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity)
-        .presentationDetents([.height(sheetHeight)])
-        .presentationDragIndicator(.hidden)
-        .interactiveDismissDisabled()
-        .presentationBackground(.background)
-        .preferredColorScheme(settings.sakuraLook.colorScheme)
-        .onAppear {
-            if game.status != .playing {
-                frozenStatus = game.status
-            }
-        }
-        .alert(t("gc_leave_title"), isPresented: $confirmLeave) {
-            Button(t("gc_leave_confirm"), role: .destructive, action: onMenu)
-            Button(t("gc_cancel"), role: .cancel) {}
-        } message: {
-            Text(t("gc_leave_message"))
-        }
     }
 
     private func requestLeave() {
@@ -112,7 +119,10 @@ struct ResultSheet: View {
         return nil
     }
 
-    private var sheetHeight: CGFloat { subtitle == nil ? 248 : 292 }
+    private var sheetHeight: CGFloat {
+        if confirmLeave { return 320 }
+        return subtitle == nil ? 248 : 292
+    }
 
     private var showPlayAgain: Bool { !opponentLeft }
 

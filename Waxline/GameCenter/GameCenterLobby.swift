@@ -76,7 +76,7 @@ extension GameCenterService {
         request.minPlayers = 2
         request.maxPlayers = 2
         request.defaultNumberOfPlayers = 2
-        request.inviteMessage = String(localized: "gc_invite_message")
+        request.inviteMessage = L10n.system("gc_invite_message")
         presentMatchmaker(for: request)
     }
 
@@ -94,7 +94,11 @@ extension GameCenterService {
         }
         controller.matchmakerDelegate = self
         DispatchQueue.main.async { [weak self] in
-            self?.topViewController()?.present(controller, animated: true)
+            guard let self, let top = self.topViewController() else {
+                self?.matchmakerPresented = false
+                return
+            }
+            top.present(controller, animated: true)
         }
     }
 
@@ -110,7 +114,7 @@ extension GameCenterService {
         matchmakerPresented = true
         guard let controller = GKMatchmakerViewController(matchRequest: request) else {
             matchmakerPresented = false
-            lastErrorMessage = String(localized: "gc_error_title")
+            lastErrorMessage = L10n.system("gc_error_title")
             return
         }
         controller.matchmakerDelegate = self
@@ -205,7 +209,7 @@ extension GameCenterService: GKLocalPlayerListener {
             request.minPlayers = 2
             request.maxPlayers = 2
             request.recipients = recipientPlayers
-            request.inviteMessage = String(localized: "gc_invite_message")
+            request.inviteMessage = L10n.system("gc_invite_message")
             self.presentMatchmaker(for: request)
         }
     }
@@ -326,7 +330,7 @@ nonisolated struct GameCenterInvite: Identifiable, @unchecked Sendable {
         if let name = inviter(in: match)?.displayName, !name.isEmpty {
             return name
         }
-        return String(localized: "gc_unknown_player")
+        return L10n.system("gc_unknown_player")
     }
 
     func loadPhoto() async -> UIImage? {

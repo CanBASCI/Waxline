@@ -42,22 +42,67 @@ final class SettingsStore {
     }
 }
 
-enum L10n {
-    static func text(_ key: String.LocalizationValue, language: LanguageOverride) -> String {
+enum DeviceLanguage: Sendable {
+    nonisolated static let catalogCodes = ["en", "tr", "de", "es", "ja"]
+
+    nonisolated static var locale: Locale {
+        Locale(identifier: primaryIdentifier)
+    }
+
+    nonisolated static var primaryIdentifier: String {
+        preferredIdentifiers.first ?? "en"
+    }
+
+    nonisolated static var catalogCode: String {
+        for identifier in preferredIdentifiers {
+            let lower = identifier.lowercased().replacingOccurrences(of: "_", with: "-")
+            if let match = catalogCodes.first(where: { lower == $0 || lower.hasPrefix($0 + "-") }) {
+                return match
+            }
+            if let code = Locale(identifier: identifier).language.languageCode?.identifier.lowercased(),
+               catalogCodes.contains(code) {
+                return code
+            }
+        }
+        return "en"
+    }
+
+    nonisolated static var preferredIdentifiers: [String] {
+        if let languages = UserDefaults.standard.persistentDomain(forName: UserDefaults.globalDomain)?["AppleLanguages"] as? [String],
+           !languages.isEmpty {
+            return languages
+        }
+        return Locale.preferredLanguages
+    }
+
+    nonisolated static func clearAppLanguageOverride() {
+        UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+    }
+}
+
+enum L10n: Sendable {
+    nonisolated static func text(_ key: String.LocalizationValue, language: LanguageOverride) -> String {
         String(
             localized: key,
             bundle: bundle(for: language),
-            locale: language.locale ?? .autoupdatingCurrent
+            locale: language.locale ?? DeviceLanguage.locale
         )
     }
 
-    private static func bundle(for language: LanguageOverride) -> Bundle {
-        guard let code = language.catalogCode,
-              let path = Bundle.main.path(forResource: code, ofType: "lproj"),
-              let bundle = Bundle(path: path)
-        else {
-            return .main
+    nonisolated static func system(_ key: String.LocalizationValue) -> String {
+        text(key, language: .system)
+    }
+
+    nonisolated private static func bundle(for language: LanguageOverride) -> Bundle {
+        let code = language.catalogCode ?? DeviceLanguage.catalogCode
+        if let path = Bundle.main.path(forResource: code, ofType: "lproj"),
+           let bundle = Bundle(path: path) {
+            return bundle
         }
-        return bundle
+        if let path = Bundle.main.path(forResource: "en", ofType: "lproj"),
+           let bundle = Bundle(path: path) {
+            return bundle
+        }
+        return .main
     }
 }

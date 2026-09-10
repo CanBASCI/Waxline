@@ -118,12 +118,16 @@ struct RootView: View {
         .sheet(isPresented: $showMoreApps) {
             MoreAppsSheet()
         }
-        .sheet(isPresented: $showOnboarding) {
+        .sheet(isPresented: $showOnboarding, onDismiss: {
+            if settings.hasCompletedOnboarding {
+                authenticateIfNeeded()
+            }
+        }) {
             OnboardingView {
                 settings.hasCompletedOnboarding = true
                 showOnboarding = false
-                authenticateIfNeeded()
             }
+            .interactiveDismissDisabled(!settings.hasCompletedOnboarding)
             .preferredColorScheme(settings.sakuraLook.colorScheme)
         }
         .sheet(isPresented: $showInvites) {
@@ -137,12 +141,6 @@ struct RootView: View {
                 }
             )
             .preferredColorScheme(settings.sakuraLook.colorScheme)
-        }
-        .background {
-            if let controller = gameCenter.authViewController {
-                GameCenterAuthPresenter(viewController: controller)
-                    .frame(width: 0, height: 0)
-            }
         }
         .onAppear {
             if !settings.hasCompletedOnboarding {
@@ -217,6 +215,10 @@ struct RootView: View {
     }
 
     private func openMultiplayer() {
+        guard gameCenter.isAuthenticated else {
+            gameCenter.authenticate()
+            return
+        }
         Task {
             await gameCenter.refreshPendingInvites()
             if gameCenter.pendingInviteCount > 0 {
